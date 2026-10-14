@@ -140,9 +140,9 @@ namespace TransferFTP
             _run.IsEnabled = false;
             var close = FlatButton.Secondary("Close", Close);
             var bottom = new DockPanel { Margin = new Thickness(0, 12, 0, 0) };
-            var right = UI.H(10, _showSame, close, _run);
-            DockPanel.SetDock(right, Dock.Right);
-            bottom.Children.Add(right);
+            var bottomRight = UI.H(10, _showSame, close, _run);
+            DockPanel.SetDock(bottomRight, Dock.Right);
+            bottom.Children.Add(bottomRight);
             bottom.Children.Add(_summary);
 
             var root = new DockPanel { Margin = new Thickness(20) };
