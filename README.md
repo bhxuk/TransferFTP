@@ -11,7 +11,7 @@ with folder sync you can preview, edit-and-save-back, server-to-server copies an
 
 **[Download TransferFTP for Windows](https://github.com/bhxuk/TransferFTP/releases/latest/download/TransferFTP-Setup.exe)**  ·  [Website](https://bhxuk.github.io/TransferFTP/)  ·  [User guide](docs/USER-GUIDE.md)  ·  [What's new](CHANGELOG.md)
 
-<img src="docs/images/main.png" alt="TransferFTP with This PC on the left, a home server over SFTP on the right and uploads running in the queue below" width="900">
+<img src="docs/images/main.png" alt="TransferFTP with tabs on both sides and quick links under each path, This PC on the left, a home server over SFTP on the right and uploads running in the queue below" width="900">
 
 </div>
 
