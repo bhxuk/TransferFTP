@@ -31,7 +31,29 @@ namespace TransferFTP
 
         public FileSystem Fs { get; private set; }
         public string CurrentPath { get; private set; } = "";
-        public FilePane Other { get; set; }
+        public Func<FilePane> OtherProvider;
+        public FilePane Other => OtherProvider?.Invoke();
+
+        /// <summary>Raised when the place or folder changes, so the tab can update its title.</summary>
+        public event Action<FilePane> TitleChanged;
+
+        /// <summary>Asks the side to open a quick link or folder in a new tab.</summary>
+        public Action<string, string> RequestNewTab;
+
+        /// <summary>"local" or the site id: the key quick links and recent folders are stored under.</summary>
+        public string SourceKey => Fs?.Site?.Id ?? "local";
+
+        public string TabTitle
+        {
+            get
+            {
+                if (Fs == null) return "New tab";
+                string folder = string.IsNullOrEmpty(CurrentPath) ? "" : Fs.NameOf(CurrentPath);
+                if (string.IsNullOrEmpty(folder)) folder = CurrentPath;
+                if (Fs.Site == null) return string.IsNullOrEmpty(CurrentPath) ? "This PC" : folder;
+                return Fs.Site.Name + (string.IsNullOrEmpty(folder) ? "" : ":  " + folder);
+            }
+        }
         public string Side { get; }
 
         public event Action<FilePane> Activated;
@@ -53,6 +75,7 @@ namespace TransferFTP
         private readonly TextBlock _overlayText;
         private readonly FlatButton _overlayRetry;
         private readonly Border _accentBar;
+        private readonly WrapPanel _links;
         private readonly Stack<string> _back = new Stack<string>();
         private List<FsItem> _items = new List<FsItem>();
         private ListCollectionView _view;
@@ -104,7 +127,8 @@ namespace TransferFTP
                 FlatButton.Tool(Icons.Up, null, "Up a folder (Backspace)", GoUp),
                 FlatButton.Tool(Icons.Home, null, "Home folder", GoHome),
                 FlatButton.Tool(Icons.Refresh, null, "Refresh (Ctrl+R)", Refresh),
-                FlatButton.Tool(Icons.FolderPlus, null, "New folder (F7)", NewFolder));
+                FlatButton.Tool(Icons.FolderPlus, null, "New folder (F7)", NewFolder),
+                FlatButton.Tool(Icons.Star, null, "Quick links and recent folders (Ctrl+D adds this folder)", ShowLinksMenu));
             navLeft.Margin = new Thickness(0, 0, 8, 0);
             _filter.Margin = new Thickness(8, 0, 0, 0);
             DockPanel.SetDock(navLeft, Dock.Left);
@@ -112,6 +136,9 @@ namespace TransferFTP
             nav.Children.Add(navLeft);
             nav.Children.Add(_filter);
             nav.Children.Add(_path);
+
+            // Quick links for this place, as chips under the path
+            _links = new WrapPanel { Margin = new Thickness(12, 0, 12, 6) };
 
             // The list
             _grid = new GridView { AllowsColumnReorder = false };
@@ -173,10 +200,12 @@ namespace TransferFTP
             DockPanel.SetDock(_accentBar, Dock.Top);
             DockPanel.SetDock(top, Dock.Top);
             DockPanel.SetDock(nav, Dock.Top);
+            DockPanel.SetDock(_links, Dock.Top);
             DockPanel.SetDock(_status, Dock.Bottom);
             root.Children.Add(_accentBar);
             root.Children.Add(top);
             root.Children.Add(nav);
+            root.Children.Add(_links);
             root.Children.Add(_status);
             root.Children.Add(listHost);
             Child = root;
@@ -185,6 +214,7 @@ namespace TransferFTP
             _refreshTimer.Tick += (s, e) => { _refreshTimer.Stop(); Refresh(); };
 
             SiteStore.Changed += FillSources;
+            Settings.QuickLinksChanged += FillLinks;
             FillSources();
         }
 
@@ -313,6 +343,8 @@ namespace TransferFTP
             _connectBtn.Visibility = remote ? Visibility.Visible : Visibility.Collapsed;
             _connectBtn.Content = UI.H(8, UI.Icon(on ? Icons.Unplug : Icons.Plug, 16, Theme.Text), UI.Text(on ? "Disconnect" : "Reconnect", 13, Theme.Text, FontWeights.SemiBold));
             _terminalBtn.Visibility = remote && Fs.Site.IsSsh ? Visibility.Visible : Visibility.Collapsed;
+            FillLinks();
+            TitleChanged?.Invoke(this);
         }
 
         private void ToggleConnection()
@@ -342,7 +374,13 @@ namespace TransferFTP
             else if (old is SmbFs) old.Dispose();
         }
 
-        public void Close() => Detach();
+        public void Close()
+        {
+            SiteStore.Changed -= FillSources;
+            Settings.QuickLinksChanged -= FillLinks;
+            _refreshTimer.Stop();
+            Detach();
+        }
 
         // ---------------- Navigation ----------------
 
@@ -400,9 +438,135 @@ namespace TransferFTP
 
         private void RememberLocation()
         {
-            string src = Fs?.Site?.Id ?? "local";
-            if (Side == "left") { Settings.Current.LeftSource = src; Settings.Current.LeftPath = CurrentPath; }
-            else { Settings.Current.RightSource = src; Settings.Current.RightPath = CurrentPath; }
+            if (Fs == null) return;
+            if (!string.IsNullOrEmpty(CurrentPath)) Settings.Current.AddRecent(SourceKey, CurrentPath);
+            FillLinks();
+            TitleChanged?.Invoke(this);
+        }
+
+        // ---------------- Quick links and recent folders ----------------
+
+        private void FillLinks()
+        {
+            _links.Children.Clear();
+            if (Fs == null) { _links.Visibility = Visibility.Collapsed; return; }
+            var mine = Settings.Current.QuickLinks.Where(q => q.Source == SourceKey).ToList();
+            foreach (var q in mine)
+            {
+                var link = q;
+                bool here = string.Equals(link.Path.TrimEnd('/', '\\'), (CurrentPath ?? "").TrimEnd('/', '\\'), StringComparison.OrdinalIgnoreCase);
+                var chip = new FlatButton
+                {
+                    Content = UI.H(6, UI.Icon(Icons.Folder, 13, here ? Theme.Accent : Theme.Muted), UI.Text(link.Name, 12, Theme.Text, FontWeights.SemiBold)),
+                    Background = here ? Theme.AccentTint : Theme.Subtle,
+                    MinHeight = 26,
+                    Height = 26,
+                    Padding = new Thickness(10, 0, 12, 0),
+                    CornerRadius = new CornerRadius(13),
+                    Margin = new Thickness(0, 0, 6, 4),
+                    ToolTip = link.Path + "\nClick to open, middle-click for a new tab, right-click to rename or remove"
+                };
+                chip.Click += (s, e) => OpenLink(link, false);
+                chip.MouseDown += (s, e) => { if (e.ChangedButton == MouseButton.Middle) { OpenLink(link, true); e.Handled = true; } };
+                chip.ContextMenu = LinkMenu(link);
+                _links.Children.Add(chip);
+            }
+            _links.Visibility = _links.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private ContextMenu LinkMenu(QuickLink link)
+        {
+            var m = new ContextMenu();
+            var open = new MenuItem { Header = "Open" };
+            open.Click += (s, e) => OpenLink(link, false);
+            var tab = new MenuItem { Header = "Open in new tab" };
+            tab.Click += (s, e) => OpenLink(link, true);
+            var rename = new MenuItem { Header = "Rename" };
+            rename.Click += (s, e) =>
+            {
+                string name = Dialogs.Prompt("Rename quick link", link.Path, link.Name);
+                if (string.IsNullOrWhiteSpace(name)) return;
+                link.Name = name.Trim();
+                Settings.Current.RenamedQuickLink();
+            };
+            var remove = new MenuItem { Header = "Remove from quick links" };
+            remove.Click += (s, e) => Settings.Current.RemoveQuickLink(link);
+            m.Items.Add(open);
+            m.Items.Add(tab);
+            m.Items.Add(new Separator());
+            m.Items.Add(rename);
+            m.Items.Add(remove);
+            return m;
+        }
+
+        public void AddQuickLink()
+        {
+            if (Fs == null || string.IsNullOrEmpty(CurrentPath)) return;
+            string suggested = Fs.NameOf(CurrentPath);
+            if (string.IsNullOrEmpty(suggested)) suggested = CurrentPath;
+            string name = Dialogs.Prompt("Add quick link", (Fs.Site == null ? "This PC" : Fs.Site.Name) + "\n" + CurrentPath, suggested);
+            if (string.IsNullOrWhiteSpace(name)) return;
+            Settings.Current.AddQuickLink(new QuickLink { Name = name.Trim(), Source = SourceKey, Path = CurrentPath });
+        }
+
+        /// <summary>Opens a link here, connecting to its site first if needed, or in a new tab.</summary>
+        public void OpenLink(QuickLink link, bool newTab)
+        {
+            if (newTab && RequestNewTab != null) { RequestNewTab(link.Source, link.Path); return; }
+            OpenPlace(link.Source, link.Path);
+        }
+
+        public void OpenPlace(string source, string path)
+        {
+            if (source == SourceKey && Fs != null && (Fs.Site == null || Fs.IsConnected)) { Navigate(path); return; }
+            if (source == "local") { OpenLocal(path); return; }
+            var site = SiteStore.Find(source);
+            if (site == null) { Dialogs.Info("Site not found", "The site for this link has been deleted."); return; }
+            Connect(site, path);
+        }
+
+        private void ShowLinksMenu()
+        {
+            var m = new ContextMenu { PlacementTarget = this, Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint };
+            void Item(string header, Action a, bool enabled = true, string gesture = null)
+            {
+                var mi = new MenuItem { Header = header, IsEnabled = enabled, InputGestureText = gesture ?? "" };
+                mi.Click += (s, e) => a();
+                m.Items.Add(mi);
+            }
+            void Label(string text)
+            {
+                m.Items.Add(new MenuItem { Header = UI.Label(text), IsEnabled = false });
+            }
+
+            bool canAdd = Fs != null && !string.IsNullOrEmpty(CurrentPath);
+            Item("Add this folder to quick links", AddQuickLink, canAdd, "Ctrl+D");
+
+            var all = Settings.Current.QuickLinks;
+            if (all.Count > 0)
+            {
+                m.Items.Add(new Separator());
+                Label("Quick links");
+                foreach (var q in all.OrderBy(x => x.Source == SourceKey ? 0 : 1).ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase))
+                {
+                    var link = q;
+                    string where = link.Source == "local" ? "This PC" : SiteStore.Find(link.Source)?.Name ?? "Deleted site";
+                    Item(link.Name + "   \u00b7  " + where, () => OpenLink(link, false));
+                }
+            }
+
+            var recent = Settings.Current.Recent(SourceKey).Where(p => p != CurrentPath).Take(10).ToList();
+            if (recent.Count > 0)
+            {
+                m.Items.Add(new Separator());
+                Label("Recent folders here");
+                foreach (var r in recent)
+                {
+                    string path = r;
+                    Item(path, () => Navigate(path));
+                }
+            }
+            m.IsOpen = true;
         }
 
         public void Refresh()
@@ -721,6 +885,13 @@ namespace TransferFTP
                     }
                     catch { }
                 }, !string.IsNullOrEmpty(CurrentPath));
+            if (one && sel[0].IsDir && RequestNewTab != null) Item("Open in new tab", null, () => RequestNewTab(SourceKey, sel[0].FullPath));
+            Item(one && sel[0].IsDir ? "Add folder to quick links" : "Add this folder to quick links", "Ctrl+D", () =>
+            {
+                if (one && sel[0].IsDir)
+                    Settings.Current.AddQuickLink(new QuickLink { Name = sel[0].Name, Source = SourceKey, Path = sel[0].FullPath });
+                else AddQuickLink();
+            }, Fs != null && (!string.IsNullOrEmpty(CurrentPath) || (one && sel[0].IsDir)));
             Item("Compare and sync with other side...", null, () => RequestSync?.Invoke(this));
             if (Fs?.Site != null && Fs.Site.IsSsh) Item("Open terminal here", null, () => RequestTerminal?.Invoke(this));
             Item("Refresh", "Ctrl+R", Refresh);
@@ -769,6 +940,9 @@ namespace TransferFTP
                     break;
                 case Key.F when ctrl:
                     _filter.Focus();
+                    break;
+                case Key.D when ctrl:
+                    AddQuickLink();
                     break;
                 case Key.Tab when !ctrl:
                     Other?.FocusList();

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -33,6 +34,51 @@ namespace TransferFTP
 
         /// <summary>Seconds of clock difference that sync treats as "the same time".</summary>
         public int SyncToleranceSeconds { get; set; } = 2;
+
+        /// <summary>Warn before saving a password for a plain (unencrypted) FTP site.</summary>
+        public bool WarnPlainFtp { get; set; } = true;
+
+        /// <summary>Open tabs on each side, restored at start-up.</summary>
+        public List<TabState> LeftTabs { get; set; }
+        public List<TabState> RightTabs { get; set; }
+        public int LeftActiveTab { get; set; }
+        public int RightActiveTab { get; set; }
+
+        /// <summary>Saved folders, locally or on a site.</summary>
+        public List<QuickLink> QuickLinks { get; set; } = new List<QuickLink>();
+
+        /// <summary>Recently opened folders for each place (key is "local" or a site id).</summary>
+        public Dictionary<string, List<string>> RecentPaths { get; set; } = new Dictionary<string, List<string>>();
+
+        public static event Action QuickLinksChanged;
+
+        public void AddQuickLink(QuickLink link)
+        {
+            QuickLinks.RemoveAll(q => q.Source == link.Source && string.Equals(q.Path, link.Path, StringComparison.OrdinalIgnoreCase));
+            QuickLinks.Add(link);
+            Save();
+            QuickLinksChanged?.Invoke();
+        }
+
+        public void RemoveQuickLink(QuickLink link)
+        {
+            QuickLinks.Remove(link);
+            Save();
+            QuickLinksChanged?.Invoke();
+        }
+
+        public void RenamedQuickLink() { Save(); QuickLinksChanged?.Invoke(); }
+
+        public void AddRecent(string source, string path)
+        {
+            if (string.IsNullOrEmpty(path)) return;
+            if (!RecentPaths.TryGetValue(source, out var list)) RecentPaths[source] = list = new List<string>();
+            list.RemoveAll(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase));
+            list.Insert(0, path);
+            if (list.Count > 15) list.RemoveRange(15, list.Count - 15);
+        }
+
+        public List<string> Recent(string source) => RecentPaths.TryGetValue(source, out var list) ? list : new List<string>();
 
         public string LeftSource { get; set; } = "local";
         public string LeftPath { get; set; } = "";
@@ -69,6 +115,19 @@ namespace TransferFTP
             }
             catch (Exception ex) { Log.Write("Settings save: " + ex.Message); }
         }
+    }
+
+    public class TabState
+    {
+        public string Source { get; set; } = "local";
+        public string Path { get; set; } = "";
+    }
+
+    public class QuickLink
+    {
+        public string Name { get; set; } = "";
+        public string Source { get; set; } = "local";
+        public string Path { get; set; } = "";
     }
 
     public static class Json

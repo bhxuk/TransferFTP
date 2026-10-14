@@ -67,7 +67,10 @@ namespace TransferFTP
     /// <summary>Base window with the app look: dark title bar, theme colours, icon.</summary>
     public class ThemedWindow : Window
     {
-        public ThemedWindow()
+        public ThemedWindow() : this(true) { }
+
+        /// <param name="owned">Dialogs and tool windows belong to the window that opened them; main windows don't.</param>
+        protected ThemedWindow(bool owned)
         {
             Background = Theme.Bg;
             Foreground = Theme.Text;
@@ -76,10 +79,15 @@ namespace TransferFTP
             UseLayoutRounding = true;
             try { Icon = Theme.AppIcon(); } catch { }
             SourceInitialized += (s, e) => Native.StyleWindow(this);
-            var main = Application.Current?.MainWindow;
-            if (main != null && main != this && main.IsLoaded)
+            Window owner = null;
+            if (owned && Application.Current != null)
             {
-                Owner = main;
+                owner = System.Linq.Enumerable.FirstOrDefault(System.Linq.Enumerable.OfType<Window>(Application.Current.Windows), w => w.IsActive && w != this && w.IsLoaded)
+                        ?? Application.Current.MainWindow;
+            }
+            if (owner != null && owner != this && owner.IsLoaded)
+            {
+                Owner = owner;
                 WindowStartupLocation = WindowStartupLocation.CenterOwner;
             }
             else WindowStartupLocation = WindowStartupLocation.CenterScreen;
@@ -165,6 +173,47 @@ namespace TransferFTP
             w.ShowDialog();
             return result;
         });
+
+        /// <summary>Asks for a password with a "remember" tick box and an optional warning. Returns null if cancelled.</summary>
+        public static string PromptPassword(string title, string message, string warning, out bool remember)
+        {
+            bool rem = false;
+            string pwd = OnUi(() =>
+            {
+                string result = null;
+                var w = Frame(title, 500);
+                var box = UI.Password();
+                var tick = new CheckBox { Content = "Remember this password (encrypted for your Windows account)" };
+                var ok = FlatButton.Primary("Connect", () => { result = box.Password; w.Close(); });
+                ok.IsDefault = true;
+                var cancel = FlatButton.Secondary("Cancel", () => w.Close());
+                cancel.IsCancel = true;
+                var body = UI.V(14, UI.Text(title, 18, Theme.Text, FontWeights.SemiBold, true), UI.Text(message, 13, Theme.Muted), box, tick);
+                if (!string.IsNullOrEmpty(warning)) body.Children.Add(WarningNote(warning));
+                body.Children.Add(Buttons(cancel, ok));
+                w.Content = new Border { Padding = new Thickness(24), Child = body };
+                w.Loaded += (s, e) => box.Focus();
+                w.ShowDialog();
+                rem = tick.IsChecked == true;
+                return result;
+            });
+            remember = rem && pwd != null;
+            return pwd;
+        }
+
+        /// <summary>An amber box with a warning icon, used for "this isn't encrypted" notes.</summary>
+        public static Border WarningNote(string text)
+        {
+            var t = UI.Text(text, 12.5, Theme.Text);
+            var icon = UI.Icon("M12 4l9 16H3zM12 10v4M12 17.5v.01", 18, Theme.Accent);
+            icon.VerticalAlignment = VerticalAlignment.Top;
+            var row = new DockPanel();
+            DockPanel.SetDock(icon, Dock.Left);
+            icon.Margin = new Thickness(0, 0, 10, 0);
+            row.Children.Add(icon);
+            row.Children.Add(t);
+            return new Border { Background = Theme.AccentTint, CornerRadius = new CornerRadius(10), Padding = new Thickness(12, 10, 12, 10), Child = row };
+        }
 
         /// <summary>Shows a list of choices as buttons. Returns the index picked, or -1. "remember" reports the tick box.</summary>
         public static int Choose(string title, string message, string[] choices, out bool remember, string rememberText = null)

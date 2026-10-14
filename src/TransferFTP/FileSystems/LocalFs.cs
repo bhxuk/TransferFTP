@@ -182,14 +182,8 @@ namespace TransferFTP
                 throw new InvalidOperationException("Add the share name in the site's \"Share and folder\" box, for example media or media/films.");
             if (!string.IsNullOrEmpty(Site.User))
             {
-                string pwd = Site.Password;
-                if (string.IsNullOrEmpty(pwd)) pwd = Site.SessionPassword;
-                if (string.IsNullOrEmpty(pwd))
-                {
-                    pwd = Dialogs.Prompt("Password", "Password for " + Site.User + " on " + _shareRoot, "", true);
-                    if (pwd == null) throw new OperationCanceledException("Cancelled");
-                    Site.SessionPassword = pwd;
-                }
+                string pwd = Passwords.Get(Site, "Password for " + Site.User + " on " + _shareRoot);
+                if (pwd == null) throw new OperationCanceledException("Cancelled");
                 int r = Native.ConnectShare(_shareRoot, Site.User, pwd);
                 if (r != 0) throw new Win32Exception(r);
             }

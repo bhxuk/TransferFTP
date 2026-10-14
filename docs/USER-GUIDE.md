@@ -24,7 +24,30 @@ For a **network share**, put the server in Host and the share in **Share and fol
 
 **Keys:** choose your private key file in the site. OpenSSH keys and PuTTY `.ppk` keys both work. If the key has a passphrase you can save it, or leave it blank to be asked.
 
-**Passwords:** tick **Remember password** to save it, encrypted for your Windows account. Leave it unticked and you'll be asked once per session.
+**Passwords:** tick **Remember password** to save it, encrypted for your Windows account (it's ticked for new sites). Leave it unticked and you'll be asked once per session. When you're asked while connecting, tick **Remember this password** to save it then.
+
+**Plain FTP:** you can save the username and password for FTP sites too. Plain FTP isn't encrypted, so the password travels over the network as readable text. TransferFTP shows a warning when you save one, with **Save anyway** to carry on or **Switch to FTPS** if your server supports it. Turn the warning off with **Don't warn me about this again**, or in Settings.
+
+## Tabs and windows
+
+Each side can hold several tabs, so you can keep a few servers or folders open at once.
+
+- **Ctrl+T** or the **+** after the tabs opens a new tab at the same place as the current one.
+- **Ctrl+W**, the **x** on a tab, or a middle-click closes it.
+- **Ctrl+Tab** and **Ctrl+Shift+Tab** move between tabs on the side you're using.
+- Right-click a folder and choose **Open in new tab**.
+- Dragging files over a tab switches to it, so you can drop them into a folder open in another tab.
+- Opening a different site while one is already connected puts it in a new tab instead of closing the first.
+- Your tabs come back next time you start TransferFTP.
+
+**Ctrl+N** or the window button at the top opens another TransferFTP window. All windows share the same transfer queue, and TransferFTP keeps running until you close the last one.
+
+## Quick links and recent folders
+
+- Press **Ctrl+D**, or the **star** button next to the path, to save the folder you're in as a quick link. Right-click a folder and choose **Add folder to quick links** to save it without opening it.
+- Quick links for the place you're looking at show as buttons under the path. Click one to jump there, middle-click to open it in a new tab, right-click to rename or remove it.
+- The **star** menu lists every quick link, on your PC and on any site. Picking one on another site connects to it.
+- The same menu lists the **recent folders** you've opened on that site or on this PC.
 
 ## Moving files
 
@@ -106,6 +129,7 @@ In **Sites**, press **Import**:
 | Keep the original modified dates | Copies keep the source file's date |
 | Show hidden files | Dot files on servers, hidden files on Windows |
 | Ask before deleting | The confirmation before a delete |
+| Warn before saving a password for plain FTP | The unencrypted FTP warning |
 | Edit remote files with | Your editor, or the Windows default |
 | Date tolerance | How far apart two dates can be and still count as the same |
 | Theme and accent | Dark, light or follow Windows, plus six colours |

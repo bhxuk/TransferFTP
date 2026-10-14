@@ -1,5 +1,16 @@
 # What's new
 
+## 1.1.0
+
+- **Tabs on both sides.** Open several places at once on the left and the right. Ctrl+T opens a new tab at the same place, Ctrl+W closes it, Ctrl+Tab switches. Middle-click a tab to close it, and drag files over a tab to drop into it. Tabs come back next time you open TransferFTP.
+- **More windows.** Ctrl+N (or the window button at the top) opens another TransferFTP window. They share the same transfer queue.
+- **Quick links.** Press Ctrl+D or the star button to save the folder you're in. Your links for that place show as buttons under the path, and the star menu lists all of them, on any site. Right-click a link to rename it, remove it or open it in a new tab.
+- **Recent folders.** The star menu also lists the last folders you opened on that site or on this PC.
+- **Saving FTP passwords.** Usernames and passwords save for every site type, including plain FTP. For plain FTP you'll see a warning that it isn't encrypted, then it saves anyway (or switch to FTPS in one click). You can turn the warning off in Settings.
+- **Remember from the password prompt.** When you're asked for a password while connecting, tick "Remember this password" to save it.
+- New sites remember their password by default.
+- Opening a different site while one is connected now opens it in a new tab instead of replacing it.
+
 ## 1.0.0
 
 The first release.

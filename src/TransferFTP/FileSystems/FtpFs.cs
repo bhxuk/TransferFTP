@@ -23,17 +23,12 @@ namespace TransferFTP
                 if (IsConnected) return;
                 _c?.Dispose();
                 string user = string.IsNullOrEmpty(Site.User) ? "anonymous" : Site.User;
-                string pwd = Site.Password;
-                if (string.IsNullOrEmpty(pwd)) pwd = Site.SessionPassword;
-                if (string.IsNullOrEmpty(pwd))
+                string pwd;
+                if (user == "anonymous" && string.IsNullOrEmpty(Site.Password)) pwd = "anonymous@";
+                else
                 {
-                    if (user == "anonymous") pwd = "anonymous@";
-                    else
-                    {
-                        pwd = Dialogs.Prompt("Password", "Password for " + user + "@" + Site.Host, "", true);
-                        if (pwd == null) throw new OperationCanceledException("Cancelled");
-                        Site.SessionPassword = pwd;
-                    }
+                    pwd = Passwords.Get(Site, "Password for " + user + "@" + Site.Host);
+                    if (pwd == null) throw new OperationCanceledException("Cancelled");
                 }
 
                 var c = new FtpClient(Site.Host.Trim(), user, pwd, Site.Port);

@@ -70,6 +70,7 @@ namespace TransferFTP
                 Section("Files",
                     Tick("Show hidden files", s.ShowHiddenFiles, v => s.ShowHiddenFiles = v),
                     Tick("Ask before deleting", s.ConfirmDelete, v => s.ConfirmDelete = v),
+                    Tick("Warn before saving a password for plain (unencrypted) FTP", s.WarnPlainFtp, v => s.WarnPlainFtp = v),
                     UI.Field("Edit remote files with", editorRow)),
                 Section("Sync",
                     UI.Field("Treat dates this many seconds apart as the same (use 60 for FTP servers that round to the minute)", tolerance)),

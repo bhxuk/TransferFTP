@@ -24,9 +24,8 @@ namespace TransferFTP
             if (string.IsNullOrEmpty(pwd)) pwd = s.SessionPassword;
             if (string.IsNullOrEmpty(pwd) && !hasKey)
             {
-                pwd = Dialogs.Prompt("Password", "Password for " + s.User + "@" + s.Host, "", true);
+                pwd = Passwords.Get(s, "Password for " + s.User + "@" + s.Host);
                 if (pwd == null) throw new OperationCanceledException("Cancelled");
-                s.SessionPassword = pwd;
             }
             if (!string.IsNullOrEmpty(pwd))
             {

@@ -20,6 +20,7 @@ namespace TransferFTP
         private readonly ComboBox _protocol;
         private readonly TextBlock _pwdHint, _testResult, _remoteLabel;
         private readonly StackPanel _sshOnly, _ftpOnly, _form;
+        private readonly Border _ftpWarning;
         private readonly TextBlock _empty;
         private Site _editing;
         private bool _loading;
@@ -84,6 +85,7 @@ namespace TransferFTP
             _sshOnly = UI.V(14, keyRow, UI.Field("Key passphrase", _passphrase));
             _ftpOnly = UI.V(14, _active);
             _testResult = UI.Text("", 13, Theme.Muted);
+            _ftpWarning = Dialogs.WarningNote(Passwords.PlainFtpWarning);
 
             var save = FlatButton.Primary("Save", () => Save(true));
             var test = FlatButton.Secondary("Test connection", Test);
@@ -94,6 +96,7 @@ namespace TransferFTP
             _form = UI.V(14,
                 UI.Field("Name", _name),
                 UI.Field("Type", _protocol),
+                _ftpWarning,
                 hostRow,
                 UI.Field("Username", _user),
                 UI.V(6, UI.Text("Password", 12, Theme.Muted, FontWeights.SemiBold), _password, _pwdHint, _rememberPwd),
@@ -170,7 +173,7 @@ namespace TransferFTP
             _user.Text = site.User;
             _password.Password = "";
             bool saved = !string.IsNullOrEmpty(site.PasswordProtected);
-            _rememberPwd.IsChecked = saved;
+            _rememberPwd.IsChecked = saved || string.IsNullOrEmpty(site.Host);   // new sites remember by default
             _pwdHint.Text = saved ? "A password is saved. Leave this blank to keep it." : "Leave blank to be asked when you connect.";
             _keyFile.Text = site.KeyFile;
             _passphrase.Password = "";
@@ -192,6 +195,7 @@ namespace TransferFTP
             bool ftp = p == Protocol.FTP || p == Protocol.FTPS || p == Protocol.FTPSImplicit;
             _sshOnly.Visibility = ssh ? Visibility.Visible : Visibility.Collapsed;
             _ftpOnly.Visibility = ftp ? Visibility.Visible : Visibility.Collapsed;
+            _ftpWarning.Visibility = p == Protocol.FTP ? Visibility.Visible : Visibility.Collapsed;
             _remoteLabel.Text = p == Protocol.SMB ? "Share and folder (e.g. media or media/films)" : "Start in folder";
             if (!_loading && int.TryParse(_port.Text, out int port) && Site.All.Any(x => Site.DefaultPort(x) == port))
                 _port.Text = Site.DefaultPort(p).ToString();
@@ -228,9 +232,40 @@ namespace TransferFTP
                 if (showErrors) Dialogs.Info("Can't save yet", problem);
                 return false;
             }
+            if (!PlainFtpOk()) return false;
             SiteStore.Upsert(_editing);
             string id = _editing.Id;
             Reload(id);
+            return true;
+        }
+
+        /// <summary>
+        /// Saving a password for plain FTP is allowed, but the person is told it travels unencrypted first.
+        /// Returns false if they cancel.
+        /// </summary>
+        private bool PlainFtpOk()
+        {
+            if (_editing.Protocol != Protocol.FTP || string.IsNullOrEmpty(_editing.PasswordProtected) || !Settings.Current.WarnPlainFtp) return true;
+            var before = SiteStore.Find(_editing.Id);
+            bool newlyRisky = before == null || before.Protocol != Protocol.FTP || string.IsNullOrEmpty(before.PasswordProtected) || _password.Password.Length > 0;
+            if (!newlyRisky) return true;
+            int pick = Dialogs.Choose("Save the password for plain FTP?", Passwords.PlainFtpWarning + "\n\nYou can still save it and carry on.",
+                new[] { "Save anyway", "Switch to FTPS", "Cancel" }, out bool dontAsk, "Don't warn me about this again");
+            if (pick == 1)
+            {
+                _editing.Protocol = Protocol.FTPS;
+                _loading = true;
+                _protocol.SelectedIndex = Array.IndexOf(Site.All, Protocol.FTPS);
+                _loading = false;
+                ProtocolChanged();
+                return true;
+            }
+            if (pick != 0) return false;
+            if (dontAsk)
+            {
+                Settings.Current.WarnPlainFtp = false;
+                Settings.Current.Save();
+            }
             return true;
         }
 

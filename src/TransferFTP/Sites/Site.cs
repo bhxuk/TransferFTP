@@ -135,7 +135,9 @@ namespace TransferFTP
                 File.Move(tmp, FilePath, true);
             }
             catch (Exception ex) { Log.Error("Couldn't save sites: " + ex.Message); }
-            Changed?.Invoke();
+            var d = System.Windows.Application.Current?.Dispatcher;
+            if (d != null && !d.CheckAccess()) d.BeginInvoke(new Action(() => Changed?.Invoke()));
+            else Changed?.Invoke();
         }
 
         public static void Upsert(Site site)
@@ -245,6 +247,38 @@ namespace TransferFTP
                 return "/" + string.Join("/", segs);
             }
             catch { return ""; }
+        }
+    }
+
+    /// <summary>Gets the password for a site: saved, typed earlier this session, or asked for now.</summary>
+    public static class Passwords
+    {
+        public const string PlainFtpWarning =
+            "Plain FTP isn't encrypted. Your username and password are sent over the network as readable text, " +
+            "so someone on the same network could see them. Saved passwords are still stored encrypted on this PC. " +
+            "Use FTPS instead if the server supports it.";
+
+        /// <summary>Returns null if the person cancels.</summary>
+        public static string Get(Site site, string prompt)
+        {
+            string pwd = site.Password;
+            if (string.IsNullOrEmpty(pwd)) pwd = site.SessionPassword;
+            if (!string.IsNullOrEmpty(pwd)) return pwd;
+
+            string warning = site.Protocol == Protocol.FTP ? PlainFtpWarning : null;
+            pwd = Dialogs.PromptPassword("Password", prompt, warning, out bool remember);
+            if (pwd == null) return null;
+            site.SessionPassword = pwd;
+            if (remember)
+            {
+                // The site object comes from the store, so saving keeps it for next time.
+                site.Password = pwd;
+                var stored = SiteStore.Find(site.Id);
+                if (stored != null && stored != site) stored.Password = pwd;
+                SiteStore.Save();
+                Log.Info("Saved the password for " + site.Name + (site.Protocol == Protocol.FTP ? " (plain FTP, not encrypted in transit)" : ""));
+            }
+            return pwd;
         }
     }
 

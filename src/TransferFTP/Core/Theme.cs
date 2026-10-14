@@ -380,6 +380,9 @@ namespace TransferFTP
         public const string Upload = "M12 20V9M7 14l5-5 5 5M5 4h14";
         public const string Retry = "M4 4v6h6M4.5 15a8 8 0 1 0 1.9-8.3L4 10";
         public const string Key = "M8 14a4 4 0 1 1 0-8a4 4 0 0 1 0 8zM11 10h10M18 10v3M21 10v4";
+        public const string Star = "M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z";
+        public const string Window = "M3 5h18v14H3zM3 9h18";
+        public const string Tab = "M3 19V7h7l2 3h9v9zM3 7V5h7v2";
         public const string Lines = "M5 6h14M5 11h14M5 16h9";
     }
 }

@@ -18,7 +18,7 @@ namespace TransferFTP
     {
         public App()
         {
-            ShutdownMode = ShutdownMode.OnMainWindowClose;
+            ShutdownMode = ShutdownMode.OnLastWindowClose;
             DispatcherUnhandledException += OnUiError;
             AppDomain.CurrentDomain.UnhandledException += (s, e) => Log.Write("Fatal: " + e.ExceptionObject);
             System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (s, e) => { Log.Write("Task: " + e.Exception); e.SetObserved(); };

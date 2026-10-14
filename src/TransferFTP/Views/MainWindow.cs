@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
@@ -19,8 +20,16 @@ namespace TransferFTP
     /// <summary>Two file panes side by side, with the transfer queue underneath.</summary>
     public class MainWindow : ThemedWindow
     {
-        private readonly FilePane _left, _right;
+        private readonly PaneSide _leftSide, _rightSide;
         private FilePane _active;
+        private readonly bool _primary;
+
+        /// <summary>How many main windows are open. Shared clean-up only happens when the last one closes.</summary>
+        private static int _openWindows;
+
+        private FilePane _left => _leftSide.Current;
+        private FilePane _right => _rightSide.Current;
+        private IEnumerable<FilePane> AllPanes => _leftSide.Tabs.Concat(_rightSide.Tabs);
         private readonly ListView _queue;
         private readonly ListView _edits;
         private readonly ListBox _log;
@@ -32,8 +41,10 @@ namespace TransferFTP
         private readonly RowDefinition _queueRow;
         private readonly DispatcherTimer _tick;
 
-        public MainWindow()
+        public MainWindow(bool primary = true) : base(false)
         {
+            _primary = primary;
+            _openWindows++;
             var s = Settings.Current;
             Title = "TransferFTP";
             Width = Math.Max(900, s.WindowWidth);
@@ -41,7 +52,15 @@ namespace TransferFTP
             MinWidth = 900;
             MinHeight = 560;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
-            if (s.WindowMaximized) WindowState = WindowState.Maximized;
+            if (s.WindowMaximized && primary) WindowState = WindowState.Maximized;
+            if (!primary)
+            {
+                // Open new windows a little offset from the one they came from.
+                WindowStartupLocation = WindowStartupLocation.Manual;
+                var from = Application.Current.Windows.OfType<MainWindow>().FirstOrDefault(w => w.IsActive) ?? Application.Current.MainWindow;
+                if (from != null && from.WindowState == WindowState.Normal) { Left = from.Left + 36; Top = from.Top + 36; Width = from.Width; Height = from.Height; }
+                else WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            }
 
             // Header
             var logo = UI.H(10, new Image { Source = Theme.AppIcon(), Width = 26, Height = 26 }, UI.Text("TransferFTP", 18, Theme.Text, FontWeights.Bold, true));
@@ -50,6 +69,7 @@ namespace TransferFTP
                 FlatButton.Tool(Icons.Server, "Sites", "Saved sites (Ctrl+S)", () => OpenSites(null)),
                 FlatButton.Tool(Icons.Sync, "Sync", "Compare and sync the two folders", () => OpenSync(_active ?? _left)),
                 FlatButton.Tool(Icons.Terminal, "Terminal", "SSH terminal for the active side (F9)", () => OpenTerminal(_active ?? _left)),
+                FlatButton.Tool(Icons.Window, null, "New window (Ctrl+N)", NewWindow),
                 FlatButton.Tool(Icons.Settings, null, "Settings", OpenSettings));
             var header = new DockPanel { Margin = new Thickness(18, 12, 18, 10) };
             DockPanel.SetDock(actions, Dock.Right);
@@ -57,16 +77,20 @@ namespace TransferFTP
             header.Children.Add(logo);
 
             // Panes
-            _left = new FilePane("left");
-            _right = new FilePane("right");
-            _left.Other = _right;
-            _right.Other = _left;
-            foreach (var p in new[] { _left, _right })
+            _leftSide = new PaneSide("left");
+            _rightSide = new PaneSide("right");
+            _leftSide.OtherCurrent = () => _rightSide.Current;
+            _rightSide.OtherCurrent = () => _leftSide.Current;
+            foreach (var side in new[] { _leftSide, _rightSide })
             {
-                p.Activated += SetActive;
-                p.RequestSync = OpenSync;
-                p.RequestTerminal = OpenTerminal;
-                p.RequestSiteManager = () => OpenSites(null);
+                side.Wire = p =>
+                {
+                    p.Activated += SetActive;
+                    p.RequestSync = OpenSync;
+                    p.RequestTerminal = OpenTerminal;
+                    p.RequestSiteManager = () => OpenSites(null);
+                };
+                side.CurrentChanged += SetActive;
             }
             var panes = new Grid { Margin = new Thickness(14, 0, 14, 0) };
             panes.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 300 });
@@ -74,10 +98,10 @@ namespace TransferFTP
             panes.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 300 });
             var vsplit = new GridSplitter { Width = 12, HorizontalAlignment = HorizontalAlignment.Stretch, ResizeBehavior = GridResizeBehavior.PreviousAndNext, Cursor = Cursors.SizeWE };
             Grid.SetColumn(vsplit, 1);
-            Grid.SetColumn(_right, 2);
-            panes.Children.Add(_left);
+            Grid.SetColumn(_rightSide, 2);
+            panes.Children.Add(_leftSide);
             panes.Children.Add(vsplit);
-            panes.Children.Add(_right);
+            panes.Children.Add(_rightSide);
 
             // Bottom: transfers, editing, log
             _queue = new ListView { SelectionMode = SelectionMode.Extended, ItemsSource = TransferQueue.Instance.Jobs };
@@ -121,13 +145,7 @@ namespace TransferFTP
                 "<TextBlock Text='{Binding Time}' Foreground='{MUTED}' Margin='0,0,12,0'/>" +
                 "<TextBlock Text='{Binding Text}' Foreground='{Binding Color}' TextWrapping='Wrap'/>" +
                 "</StackPanel>");
-            Log.Line += (time, text, error) => Dispatcher.BeginInvoke(new Action(() =>
-            {
-                _logLines.Add(new LogLine { Time = time.ToString("HH:mm:ss"), Text = text, Color = error ? Theme.Red : Theme.Text });
-                while (_logLines.Count > 2000) _logLines.RemoveAt(0);
-                _log.ScrollIntoView(_logLines[_logLines.Count - 1]);
-                if (error) _tabLog.Content = "Log (!)";
-            }));
+            Log.Line += OnLogLine;
 
             _tabTransfers = Tab("Transfers", () => ShowTab(0));
             _tabEdits = Tab("Editing", () => ShowTab(1));
@@ -185,7 +203,34 @@ namespace TransferFTP
             PreviewKeyDown += GlobalKeys;
             Loaded += (o, e) => RestoreSession();
             Closing += OnClosing;
-            SetActive(_left);
+            Closed += (o, e) =>
+            {
+                Log.Line -= OnLogLine;
+                TransferQueue.Instance.Finished -= OnJobFinished;
+                TransferQueue.Instance.Changed -= UpdateSummary;
+                _tick.Stop();
+                // Keep dialogs centred on a window that's still open.
+                if (Application.Current.MainWindow == this)
+                    Application.Current.MainWindow = Application.Current.Windows.OfType<MainWindow>().FirstOrDefault(w => w != this);
+            };
+        }
+
+        private void OnLogLine(DateTime time, string text, bool error)
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                _logLines.Add(new LogLine { Time = time.ToString("HH:mm:ss"), Text = text, Color = error ? Theme.Red : Theme.Text });
+                while (_logLines.Count > 2000) _logLines.RemoveAt(0);
+                _log.ScrollIntoView(_logLines[_logLines.Count - 1]);
+                if (error) _tabLog.Content = "Log (!)";
+            }));
+        }
+
+        private void NewWindow()
+        {
+            var w = new MainWindow(false);
+            w.Show();
+            w.Activate();
         }
 
         private static FlatButton Tab(string text, Action click)
@@ -209,23 +254,29 @@ namespace TransferFTP
         private void SetActive(FilePane p)
         {
             _active = p;
-            _left.SetActive(p == _left);
-            _right.SetActive(p == _right);
+            foreach (var pane in AllPanes) pane.SetActive(pane == p);
         }
+
+        private PaneSide ActiveSide => _active != null && _rightSide.Tabs.Contains(_active) ? _rightSide : _leftSide;
 
         private void RestoreSession()
         {
             var s = Settings.Current;
-            Restore(_left, s.LeftSource, s.LeftPath);
-            Restore(_right, s.RightSource, s.RightPath);
+            if (_primary)
+            {
+                // Tabs from last time, or the single folder saved by version 1.0.0.
+                var left = s.LeftTabs ?? new List<TabState> { new TabState { Source = s.LeftSource ?? "local", Path = s.LeftPath ?? "" } };
+                var right = s.RightTabs ?? new List<TabState> { new TabState { Source = s.RightSource ?? "local", Path = s.RightPath ?? "" } };
+                _leftSide.Restore(left, s.LeftActiveTab);
+                _rightSide.Restore(right, s.RightActiveTab);
+            }
+            else
+            {
+                _leftSide.Restore(null, 0);
+                _rightSide.Restore(null, 0);
+            }
+            SetActive(_left);
             _left.FocusList();
-        }
-
-        private static void Restore(FilePane pane, string source, string path)
-        {
-            var site = source == "local" ? null : SiteStore.Find(source);
-            if (site == null) pane.OpenLocal(string.IsNullOrEmpty(path) || source != "local" ? null : path);
-            else pane.Connect(site, path);
         }
 
         private void UpdateSummary()
@@ -276,7 +327,7 @@ namespace TransferFTP
 
         private void OnJobFinished(TransferJob j)
         {
-            foreach (var pane in new[] { _left, _right })
+            foreach (var pane in AllPanes)
             {
                 var fs = pane.Fs;
                 if (fs == null) continue;
@@ -299,9 +350,12 @@ namespace TransferFTP
         {
             var w = new SiteManagerWindow(select)
             {
-                ConnectRequested = (site, side) =>
+                ConnectRequested = (site, sideName) =>
                 {
-                    var pane = side == "right" ? _right : _left;
+                    var side = sideName == "right" ? _rightSide : _leftSide;
+                    var pane = side.Current;
+                    // Keep an existing connection open: put a different site in a new tab instead of replacing it.
+                    if (pane.Fs?.Site != null && pane.Fs.IsConnected && pane.Fs.Site.Id != site.Id) pane = side.AddTab();
                     pane.Connect(site, null);
                     SetActive(pane);
                     if (!string.IsNullOrWhiteSpace(site.LocalFolder) && System.IO.Directory.Exists(site.LocalFolder))
@@ -344,35 +398,53 @@ namespace TransferFTP
         private void OpenSettings()
         {
             new SettingsWindow().ShowDialog();
-            _left.Refresh();
-            _right.Refresh();
+            foreach (var p in AllPanes) p.Refresh();
         }
 
         private void GlobalKeys(object sender, KeyEventArgs e)
         {
             bool ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
-            if (ctrl && e.Key == Key.S) { OpenSites(null); e.Handled = true; }
-            else if (e.Key == Key.F9) { OpenTerminal(_active); e.Handled = true; }
+            bool shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+            if (ctrl && e.Key == Key.S) OpenSites(null);
+            else if (e.Key == Key.F9) OpenTerminal(_active);
+            else if (ctrl && e.Key == Key.T) ActiveSide.Duplicate();
+            else if (ctrl && e.Key == Key.W) ActiveSide.CloseTab(ActiveSide.Current);
+            else if (ctrl && e.Key == Key.Tab) ActiveSide.Cycle(shift ? -1 : 1);
+            else if (ctrl && e.Key == Key.N) NewWindow();
+            else return;
+            e.Handled = true;
         }
 
         private void OnClosing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            if (TransferQueue.Instance.IsBusy &&
+            bool last = _openWindows <= 1;
+            if (last && TransferQueue.Instance.IsBusy &&
                 !Dialogs.Confirm("Transfers are still running", "Closing now stops them. Paused and unfinished files can be resumed next time by copying them again.", "Close anyway"))
             {
                 e.Cancel = true;
                 return;
             }
+            _openWindows--;
             var s = Settings.Current;
-            s.WindowMaximized = WindowState == WindowState.Maximized;
-            if (WindowState == WindowState.Normal) { s.WindowWidth = Width; s.WindowHeight = Height; }
-            s.QueueHeight = _queueRow.ActualHeight;
+            if (_primary)
+            {
+                s.WindowMaximized = WindowState == WindowState.Maximized;
+                if (WindowState == WindowState.Normal) { s.WindowWidth = Width; s.WindowHeight = Height; }
+                s.QueueHeight = _queueRow.ActualHeight;
+                s.LeftTabs = _leftSide.State();
+                s.RightTabs = _rightSide.State();
+                s.LeftActiveTab = _leftSide.Tabs.IndexOf(_leftSide.Current);
+                s.RightActiveTab = _rightSide.Tabs.IndexOf(_rightSide.Current);
+            }
             s.Save();
-            TransferQueue.Instance.CancelAll();
-            TransferQueue.Instance.DisposePool();
-            EditManager.StopAll();
-            _left.Close();
-            _right.Close();
+            if (last)
+            {
+                TransferQueue.Instance.CancelAll();
+                TransferQueue.Instance.DisposePool();
+                EditManager.StopAll();
+            }
+            _leftSide.CloseAll();
+            _rightSide.CloseAll();
         }
     }
 }

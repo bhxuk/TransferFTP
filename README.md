@@ -21,7 +21,8 @@ with folder sync you can preview, edit-and-save-back, server-to-server copies an
 
 | | |
 |---|---|
-| **Two panes** | Any place on either side: This PC, a saved site, or a network share. Drag between them, or press F5 to copy and F6 to move. |
+| **Two panes, with tabs** | Any place on either side: This PC, a saved site, or a network share. Open as many tabs as you like on each side, or a whole new window. Drag between them, or press F5 to copy and F6 to move. |
+| **Quick links** | Save folders you use a lot, on your PC or any server, and jump back with one click. Recent folders are a click away too. |
 | **Every protocol you need** | SFTP and SCP (password or key, including PuTTY keys), FTP, FTPS explicit and implicit, and Windows or NAS shares (SMB). |
 | **Server to server** | Drag from one server straight to another. Files stream through your PC, no temporary copies. |
 | **A proper queue** | Several files at once, live speed and time left, pause and resume, automatic retry when the connection drops, and resume of half-finished files. |
@@ -64,11 +65,16 @@ Needs Windows 10 (version 2004 or later) or Windows 11, 64-bit. Everything it ne
 | Backspace, Alt+Left | Up a folder, back |
 | Tab | Switch sides |
 | Ctrl+L, Ctrl+F, Ctrl+R | Path box, filter, refresh |
+| Ctrl+T, Ctrl+W, Ctrl+Tab | New tab, close tab, next tab |
+| Ctrl+N | New window |
+| Ctrl+D | Add this folder to quick links |
 | Ctrl+S, F9 | Sites, terminal |
 
 ## Where things are kept
 
 Settings, saved sites and trusted server keys live in `%AppData%\TransferFTP`. Passwords in `sites.json` are encrypted for your Windows account, so they can't be read on another PC or by another user. Site exports never include passwords.
+
+Passwords can be saved for every site type. Plain FTP sends them over the network unencrypted, so TransferFTP warns you before saving one for an FTP site, then saves it if you carry on. Use FTPS where the server supports it.
 
 ## Build it yourself
 
