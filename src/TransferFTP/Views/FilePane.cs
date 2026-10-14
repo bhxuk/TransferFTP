@@ -70,6 +70,15 @@ namespace TransferFTP
         private readonly GridView _grid;
         private readonly GridViewColumn _permsCol;
         private readonly TextBlock _status;
+        private readonly FlatButton _sizeBtn;
+        private readonly TextBlock _spaceText;
+        private readonly Border _spaceBar, _spaceFill;
+        private readonly StackPanel _spaceBox;
+        private int _spaceTicket;
+        private System.Threading.CancellationTokenSource _sizeCts;
+        private bool _sizing;
+        private long _treeTotal = -1;       // folder size including subfolders, once worked out
+        private string _sizeProgress;
         private readonly TextBlock _conn;
         private readonly Border _overlay;
         private readonly TextBlock _overlayText;
@@ -195,7 +204,38 @@ namespace TransferFTP
 
             _status = UI.Text("", 12, Theme.Muted);
             _status.TextWrapping = TextWrapping.NoWrap;
-            _status.Margin = new Thickness(14, 6, 14, 10);
+            _status.TextTrimming = TextTrimming.CharacterEllipsis;
+            _status.VerticalAlignment = VerticalAlignment.Center;
+
+            // "Include subfolders": adds up everything below this folder (or the selected folders).
+            _sizeBtn = new FlatButton
+            {
+                Content = UI.Text("Include subfolders", 12, Theme.Accent, FontWeights.SemiBold),
+                Background = Brushes.Transparent, MinHeight = 22, Height = 22, Padding = new Thickness(8, 0, 8, 0),
+                CornerRadius = new CornerRadius(11), Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center
+            };
+            Tips.Set(_sizeBtn, "Add up folder sizes|Count everything inside the subfolders too. If folders are selected, only those are added up. Sizes appear in the Size column");
+            _sizeBtn.Click += (s, e) => { if (_sizing) CancelSizing(); else CalculateSizes(); };
+
+            // Free space on the drive or server, with a small usage bar.
+            _spaceFill = new Border { CornerRadius = new CornerRadius(3), Background = Theme.Teal, HorizontalAlignment = HorizontalAlignment.Left, Width = 0 };
+            _spaceBar = new Border { Width = 70, Height = 6, CornerRadius = new CornerRadius(3), Background = Theme.Subtle, Child = _spaceFill, VerticalAlignment = VerticalAlignment.Center };
+            _spaceText = UI.Text("", 12, Theme.Muted);
+            _spaceText.TextWrapping = TextWrapping.NoWrap;
+            _spaceText.VerticalAlignment = VerticalAlignment.Center;
+            _spaceBox = UI.H(8, _spaceBar, _spaceText);
+            _spaceBox.Visibility = Visibility.Collapsed;
+            _spaceBox.Margin = new Thickness(12, 0, 0, 0);
+
+            var statusRow = new DockPanel { Margin = new Thickness(14, 4, 12, 8), MinHeight = 26 };
+            DockPanel.SetDock(_spaceBox, Dock.Right);
+            DockPanel.SetDock(_sizeBtn, Dock.Right);   // inside statusLeft: sits just after the text
+            statusRow.Children.Add(_spaceBox);
+            var statusLeft = new DockPanel { HorizontalAlignment = HorizontalAlignment.Left };
+            statusLeft.Children.Add(_sizeBtn);
+            statusLeft.Children.Add(_status);
+            statusRow.Children.Add(statusLeft);
+            var statusHost = new Border { BorderBrush = Theme.Line, BorderThickness = new Thickness(0, 1, 0, 0), Child = statusRow };
 
             _accentBar = new Border { Height = 2, Background = Brushes.Transparent };
 
@@ -204,12 +244,12 @@ namespace TransferFTP
             DockPanel.SetDock(top, Dock.Top);
             DockPanel.SetDock(nav, Dock.Top);
             DockPanel.SetDock(_links, Dock.Top);
-            DockPanel.SetDock(_status, Dock.Bottom);
+            DockPanel.SetDock(statusHost, Dock.Bottom);
             root.Children.Add(_accentBar);
             root.Children.Add(top);
             root.Children.Add(nav);
             root.Children.Add(_links);
-            root.Children.Add(_status);
+            root.Children.Add(statusHost);
             root.Children.Add(listHost);
             Child = root;
 
@@ -346,6 +386,7 @@ namespace TransferFTP
             _connectBtn.Visibility = remote ? Visibility.Visible : Visibility.Collapsed;
             _connectBtn.Content = UI.H(8, UI.Icon(on ? Icons.Unplug : Icons.Plug, 16, Theme.Text), UI.Text(on ? "Disconnect" : "Reconnect", 13, Theme.Text, FontWeights.SemiBold));
             _terminalBtn.Visibility = remote && Fs.Site.IsSsh ? Visibility.Visible : Visibility.Collapsed;
+            UpdateSpace();
             FillLinks();
             TitleChanged?.Invoke(this);
         }
@@ -394,6 +435,7 @@ namespace TransferFTP
             var fs = Fs;
             string target = path;
             int ticket = ++_loadTicket;
+            if (target != CurrentPath) { CancelSizing(); _treeTotal = -1; }
             ShowOverlay("Loading...", false, delayed: true);
             Task.Run(() =>
             {
@@ -431,8 +473,16 @@ namespace TransferFTP
                 CurrentPath = target;
                 _path.Text = target;
                 if (!sameFolder) _filter.Text = "";
+                // Keep folder sizes already worked out when refreshing the same folder.
+                if (sameFolder && _items != null)
+                {
+                    var known = _items.Where(i => i.IsDir && i.SizeComputed).ToDictionary(i => i.Name, i => i.Size);
+                    foreach (var it in t.Result) if (it.IsDir && known.TryGetValue(it.Name, out long sz)) { it.Size = sz; it.SizeComputed = true; }
+                    if (!_sizing) _treeTotal = -1;
+                }
                 _items = t.Result;
                 Bind();
+                UpdateSpace();
                 if (keep.Count > 0) foreach (var it in _items.Where(i => keep.Contains(i.Name))) _list.SelectedItems.Add(it);
                 HideOverlay();
                 RememberLocation();
@@ -697,13 +747,149 @@ namespace TransferFTP
 
         private void UpdateStatus()
         {
+            bool driveList = Fs is LocalFs && !(Fs is SmbFs) && string.IsNullOrEmpty(CurrentPath);
+            _sizeBtn.Visibility = _view == null || driveList || _items.All(i => !i.IsDir || i.IsParent) && !_sizing ? Visibility.Collapsed : Visibility.Visible;
             if (_view == null) { _status.Text = ""; return; }
-            int count = _items.Count(i => !i.IsParent);
+            var real = _items.Where(i => !i.IsParent).ToList();
+            int folders = real.Count(i => i.IsDir), files = real.Count - folders;
             var sel = Selected();
-            long bytes = sel.Where(i => !i.IsDir).Sum(i => Math.Max(0, i.Size));
-            _status.Text = sel.Count > 0
-                ? string.Format("{0} of {1} selected{2}", sel.Count, count, bytes > 0 ? ", " + Fmt.Size(bytes) : "")
-                : count + (count == 1 ? " item" : " items");
+            if (_sizing)
+            {
+                _status.Text = _sizeProgress ?? "Adding up...";
+                return;
+            }
+            if (sel.Count > 0)
+            {
+                long bytes = sel.Sum(i => (!i.IsDir || i.SizeComputed) ? Math.Max(0, i.Size) : 0);
+                bool partial = sel.Any(i => i.IsDir && !i.SizeComputed);
+                _status.Text = string.Format("{0} of {1} selected{2}", sel.Count, real.Count,
+                    bytes > 0 ? ", " + Fmt.Size(bytes) + (partial ? " (not counting folders)" : "") : "");
+                return;
+            }
+            if (driveList) { _status.Text = real.Count + " places"; return; }
+            long here = real.Where(i => !i.IsDir).Sum(i => Math.Max(0, i.Size));
+            string counts = (folders > 0 ? folders + (folders == 1 ? " folder, " : " folders, ") : "") + files + (files == 1 ? " file" : " files");
+            string size = _treeTotal >= 0
+                ? Fmt.Size(_treeTotal) + " including subfolders"
+                : (files > 0 ? Fmt.Size(here) + (folders > 0 ? " in files here" : "") : "");
+            _status.Text = counts + (size.Length > 0 ? "  \u00b7  " + size : "");
+        }
+
+        // ---------------- Folder sizes ----------------
+
+        private void CancelSizing()
+        {
+            try { _sizeCts?.Cancel(); } catch { }
+        }
+
+        /// <summary>Adds up the selected folders, or every subfolder here, filling in the Size column as each one finishes.</summary>
+        public void CalculateSizes()
+        {
+            if (Fs == null || _sizing) return;
+            var picked = Selected().Where(i => i.IsDir && !i.IsDrive && !i.IsLink).ToList();
+            bool wholeFolder = picked.Count == 0;
+            var targets = wholeFolder ? _items.Where(i => i.IsDir && !i.IsParent && !i.IsLink).ToList() : picked;
+            long filesHere = wholeFolder ? _items.Where(i => !i.IsDir).Sum(i => Math.Max(0, i.Size)) : 0;
+            var fs = Fs;
+            string folder = CurrentPath;
+            _sizeCts = new System.Threading.CancellationTokenSource();
+            var token = _sizeCts.Token;
+            _sizing = true;
+            _sizeProgress = "Adding up...";
+            _sizeBtn.Content = UI.Text("Stop", 12, Theme.Accent, FontWeights.SemiBold);
+            UpdateStatus();
+            var started = DateTime.Now;
+
+            Task.Run(() =>
+            {
+                // Servers get their own connection so browsing stays quick while this runs.
+                FileSystem walker = fs.IsLocal || fs is LocalFs ? fs : fs.CreateSibling();
+                try
+                {
+                    if (walker != fs) walker.Connect();
+                    long grand = filesHere;
+                    int files = 0;
+                    foreach (var dir in targets)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        long before = grand;
+                        long size = walker.TreeSize(dir.FullPath, token, (bytes, count) =>
+                        {
+                            string text = "Adding up " + dir.Name + "...  " + count.ToString("N0") + " files, " + Fmt.Size(before + bytes);
+                            Dispatcher.BeginInvoke(new Action(() => { if (_sizing && CurrentPath == folder) { _sizeProgress = text; UpdateStatus(); } }));
+                        }, ref files);
+                        grand += size;
+                        var d = dir;
+                        Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            d.Size = size;
+                            d.SizeComputed = true;
+                            if (CurrentPath == folder) _view?.Refresh();
+                        }));
+                    }
+                    return grand;
+                }
+                finally
+                {
+                    if (walker != fs) { try { walker.Dispose(); } catch { } }
+                }
+            }, token).ContinueWith(t =>
+            {
+                _sizing = false;
+                _sizeProgress = null;
+                _sizeBtn.Content = UI.Text("Include subfolders", 12, Theme.Accent, FontWeights.SemiBold);
+                if (t.IsFaulted)
+                {
+                    string msg = TransferQueue.Friendly(t.Exception.GetBaseException());
+                    Log.Error("Couldn't add up folder sizes: " + msg);
+                    Dialogs.Info("Couldn't add up the sizes", msg);
+                }
+                else if (!t.IsCanceled && wholeFolder && CurrentPath == folder && Fs == fs)
+                {
+                    _treeTotal = t.Result;
+                }
+                if (CurrentPath == folder) { _view?.Refresh(); UpdateStatus(); }
+            }, TaskScheduler.FromCurrentSynchronizationContext());
+        }
+
+        /// <summary>Looks up free space in the background; quietly hides the bar when a server won't say.</summary>
+        private void UpdateSpace()
+        {
+            var fs = Fs;
+            string path = CurrentPath;
+            int ticket = ++_spaceTicket;
+            if (fs == null || (fs is LocalFs && !(fs is SmbFs) && string.IsNullOrEmpty(path)) || (fs.Site != null && !fs.IsConnected))
+            {
+                _spaceBox.Visibility = Visibility.Collapsed;
+                return;
+            }
+            Task.Run(() => fs.GetSpace(path)).ContinueWith(t =>
+            {
+                if (ticket != _spaceTicket || Fs != fs) return;
+                var info = t.IsFaulted ? null : t.Result;
+                if (info == null)
+                {
+                    _spaceText.Text = "Free space not reported";
+                    _spaceBar.Visibility = Visibility.Collapsed;
+                    _spaceBox.Visibility = Visibility.Visible;
+                    Tips.Set(_spaceBox, "Free space|This server doesn't say how much space is left. Plain FTP servers often don't");
+                    return;
+                }
+                double used = info.UsedFraction;
+                _spaceBar.Visibility = used >= 0 ? Visibility.Visible : Visibility.Collapsed;
+                if (used >= 0)
+                {
+                    _spaceFill.Width = Math.Max(2, _spaceBar.Width * used);
+                    _spaceFill.Background = used >= 0.9 ? Theme.Red : used >= 0.75 ? Theme.Accent : Theme.Teal;
+                }
+                _spaceText.Text = info.Total > 0 ? Fmt.Size(info.Free) + " free of " + Fmt.Size(info.Total) : Fmt.Size(info.Free) + " free";
+                _spaceText.Foreground = used >= 0.9 ? Theme.Red : Theme.Muted;
+                string where = fs.Site == null ? "this drive" : fs.Site.Name;
+                Tips.Set(_spaceBox, "Free space on " + where + "|" + (info.Total > 0
+                    ? Fmt.Size(info.Free) + " free, " + Fmt.Size(info.Total - info.Free) + " used (" + (int)Math.Round(used * 100) + "%) of " + Fmt.Size(info.Total)
+                    : Fmt.Size(info.Free) + " free. This server doesn't report the total size"));
+                _spaceBox.Visibility = Visibility.Visible;
+            }, TaskScheduler.FromCurrentSynchronizationContext());
         }
 
         private void ShowOverlay(string text, bool retry, bool delayed = false)
@@ -897,6 +1083,7 @@ namespace TransferFTP
             }, Fs != null && (!string.IsNullOrEmpty(CurrentPath) || (one && sel[0].IsDir)));
             Item("Compare and sync with other side...", null, () => RequestSync?.Invoke(this));
             if (Fs?.Site != null && Fs.Site.IsSsh) Item("Open terminal here", null, () => RequestTerminal?.Invoke(this));
+            Item(any && sel.Any(i => i.IsDir) ? "Calculate folder size" : "Calculate size with subfolders", null, CalculateSizes, !_sizing && _items.Any(i => i.IsDir && !i.IsParent));
             Item("Refresh", "Ctrl+R", Refresh);
             return m;
         }

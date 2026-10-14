@@ -151,6 +151,19 @@ namespace TransferFTP
             try { File.SetLastWriteTime(path, local); } catch { }
         }
 
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+        [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+        private static extern bool GetDiskFreeSpaceEx(string directory, out ulong freeToCaller, out ulong total, out ulong totalFree);
+
+        /// <summary>Works for local drives and network shares (\\server\share) alike.</summary>
+        public override SpaceInfo GetSpace(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            string dir = path.EndsWith("\\") ? path : path + "\\";
+            if (!GetDiskFreeSpaceEx(dir, out ulong free, out ulong total, out _)) return null;
+            return new SpaceInfo { Free = (long)free, Total = (long)total };
+        }
+
         public override FileSystem CreateSibling() => new LocalFs();
 
         public override void Dispose() { }

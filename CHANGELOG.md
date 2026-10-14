@@ -1,5 +1,12 @@
 # What's new
 
+## 1.3.0
+
+- **Free space at the bottom of each side.** Shows how much space is left on that drive, network share or server, with a small bar that turns amber when it's three-quarters full and red at 90%. Hover it for the exact used and free amounts. Works on This PC, network shares and SFTP/SCP servers. FTP servers only show it if they support reporting it (many don't).
+- **Folder size.** The bottom of each side shows how many folders and files are in the folder and how much the files add up to.
+- **Include subfolders.** Click it to add up everything inside the subfolders too. Each folder's size fills in the Size column as it's counted, and the total shows at the bottom. Select some folders first to add up just those. Press **Stop** to cancel. Also on the right-click menu as **Calculate folder size**.
+- Selecting files shows their combined size, including folders once they've been added up.
+
 ## 1.2.0
 
 - **One-click updates.** When a new version is out, an **Update** button appears at the top of the window. One click downloads it, installs it and reopens TransferFTP with your tabs as they were. **Settings > Updates** has a **Check and update** button, and you can choose to install updates automatically.

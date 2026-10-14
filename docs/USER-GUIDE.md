@@ -28,6 +28,16 @@ For a **network share**, put the server in Host and the share in **Share and fol
 
 **Plain FTP:** you can save the username and password for FTP sites too. Plain FTP isn't encrypted, so the password travels over the network as readable text. TransferFTP shows a warning when you save one, with **Save anyway** to carry on or **Switch to FTPS** if your server supports it. Turn the warning off with **Don't warn me about this again**, or in Settings.
 
+## Space and folder sizes
+
+The bar at the bottom of each side shows:
+
+- **On the left:** how many folders and files are in the folder you're looking at, and how much the files add up to. Select files to see their combined size instead.
+- **Include subfolders:** click it to add up everything inside the subfolders as well. Each folder's size appears in the Size column as it's counted, and the full total shows at the bottom. Select some folders first to add up only those. Click **Stop** to cancel. Big folders on a slow server can take a while; you can keep browsing while it counts.
+- **On the right:** the free space left on that drive, share or server, with a bar showing how full it is. It turns amber at 75% full and red at 90%. Hover over it for the exact numbers.
+
+Free space works on This PC, network shares and SFTP/SCP servers. FTP has no standard way to report it, so many FTP servers show **Free space not reported**.
+
 ## Tabs and windows
 
 Each side can hold several tabs, so you can keep a few servers or folders open at once.

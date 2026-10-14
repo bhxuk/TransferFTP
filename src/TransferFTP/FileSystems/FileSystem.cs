@@ -18,7 +18,10 @@ namespace TransferFTP
         public DateTime Modified { get; set; }
         public string Perms { get; set; } = "";
 
-        public string SizeText => IsDir ? (IsDrive && Size > 0 ? Fmt.Size(Size) + " free" : "") : Fmt.Size(Size);
+        /// <summary>For folders: set once the size of everything inside has been added up.</summary>
+        public bool SizeComputed { get; set; }
+
+        public string SizeText => IsDir ? (IsDrive && Size > 0 ? Fmt.Size(Size) + " free" : SizeComputed ? Fmt.Size(Size) : "") : Fmt.Size(Size);
         public string ModifiedText => IsParent ? "" : Fmt.Date(Modified);
         public string Kind => IsParent ? "" : IsDrive ? "Drive" : IsDir ? "Folder" : Ext.Length > 0 ? Ext.ToUpperInvariant().TrimStart('.') + " file" : "File";
         public string Ext => IsDir ? "" : Path.GetExtension(Name ?? "") ?? "";
@@ -27,6 +30,14 @@ namespace TransferFTP
         public string SortKey => (IsParent ? "0" : IsDir ? "1" : "2") + (Name ?? "").ToLowerInvariant();
 
         public override string ToString() => Name;
+    }
+
+    /// <summary>Free and total space where a folder lives. Total is 0 when the server only reports free space.</summary>
+    public class SpaceInfo
+    {
+        public long Free;
+        public long Total;
+        public double UsedFraction => Total > 0 ? Math.Max(0, Math.Min(1, 1 - (double)Free / Total)) : -1;
     }
 
     /// <summary>Anything that can list, read and write files: the local disk, an SFTP or FTP server, a network share.</summary>
@@ -67,6 +78,29 @@ namespace TransferFTP
         public virtual void SetModified(string path, DateTime local) { }
         public virtual bool CanChmod => false;
         public virtual void Chmod(string path, int mode) { }
+
+        /// <summary>Free space on the drive or server holding this path, or null if it can't be found out.</summary>
+        public virtual SpaceInfo GetSpace(string path) => null;
+
+        /// <summary>Adds up every file under a folder. Progress reports bytes and files counted so far.</summary>
+        public long TreeSize(string path, System.Threading.CancellationToken token, Action<long, int> progress, ref int files)
+        {
+            long total = 0;
+            foreach (var item in List(path))
+            {
+                token.ThrowIfCancellationRequested();
+                if (item.IsParent) continue;
+                if (item.IsDir)
+                {
+                    if (!item.IsLink) total += TreeSize(item.FullPath, token, progress, ref files);
+                    continue;
+                }
+                total += Math.Max(0, item.Size);
+                files++;
+                if (files % 200 == 0) progress?.Invoke(total, files);
+            }
+            return total;
+        }
 
         /// <summary>A second, independent connection to the same place, so transfers don't block browsing.</summary>
         public abstract FileSystem CreateSibling();

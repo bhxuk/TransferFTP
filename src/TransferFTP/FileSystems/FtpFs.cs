@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using FluentFTP;
 
 namespace TransferFTP
@@ -143,6 +144,27 @@ namespace TransferFTP
 
         public override bool CanChmod => true;
         public override void Chmod(string path, int mode) { lock (Gate) C.SetFilePermissions(path, ModeToOctal(mode)); }
+
+        private bool _noAvbl;
+
+        /// <summary>FTP has no standard way to ask; servers that support AVBL (Pure-FTPd, ProFTPD, some NAS boxes) report free space.</summary>
+        public override SpaceInfo GetSpace(string path)
+        {
+            if (_noAvbl) return null;
+            try
+            {
+                FtpReply reply;
+                lock (Gate) reply = C.Execute("AVBL " + path);
+                if (reply.Success)
+                {
+                    string digits = new string((reply.Message ?? "").Trim().TakeWhile(char.IsDigit).ToArray());
+                    if (long.TryParse(digits, out long free)) return new SpaceInfo { Free = free, Total = 0 };
+                }
+                _noAvbl = true;
+            }
+            catch (Exception ex) { Log.Write("AVBL: " + ex.Message); _noAvbl = true; }
+            return null;
+        }
 
         public override FileSystem CreateSibling() => new FtpFs(Site);
 

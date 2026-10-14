@@ -249,6 +249,37 @@ namespace TransferFTP
             return string.IsNullOrEmpty(cmd.Error) ? cmd.Result : cmd.Result + cmd.Error;
         }
 
+        /// <summary>Asks the server (OpenSSH's statvfs extension), falling back to running df.</summary>
+        public override SpaceInfo GetSpace(string path)
+        {
+            try
+            {
+                object st;
+                lock (Gate) st = C.GetStatus(path);
+                ulong Get(string name)
+                {
+                    var p = st.GetType().GetProperty(name);
+                    return p == null ? 0 : Convert.ToUInt64(p.GetValue(st));
+                }
+                ulong unit = Get("BlockSize");
+                if (unit == 0) unit = Get("FileSystemBlockSize");
+                ulong total = Get("TotalBlocks") * unit, avail = Get("AvailableBlocks") * unit;
+                if (total > 0) return new SpaceInfo { Free = (long)avail, Total = (long)total };
+            }
+            catch (Exception ex) { Log.Write("statvfs not available: " + ex.Message); }
+
+            try
+            {
+                // POSIX df: "Filesystem 1024-blocks Used Available Capacity Mounted on"
+                string output = Run("df -Pk '" + path.Replace("'", "'\\''") + "' 2>/dev/null | tail -1");
+                var parts = output.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 4 && long.TryParse(parts[1], out long blocks) && long.TryParse(parts[3], out long avail))
+                    return new SpaceInfo { Free = avail * 1024, Total = blocks * 1024 };
+            }
+            catch (Exception ex) { Log.Write("df failed: " + ex.Message); }
+            return null;
+        }
+
         public override FileSystem CreateSibling() => new SftpFs(Site);
 
         public override void Dispose()
