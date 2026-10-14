@@ -20,7 +20,9 @@ The first time you connect to an SSH server you'll see its fingerprint. Check it
 | FTPS (implicit) | Older FTPS servers | 990 |
 | Network share | Windows shares and NAS shares (`\\server\share`) | 445 |
 
-For a **network share**, put the server in Host and the share in **Share and folder**, for example `media` or `media/films`. Leave the username blank to use your Windows sign-in.
+For a **network share**, put the computer's name or address in **Host** (a Tailscale name like `nas.tailnet.ts.net` works). Leave **Share and folder** blank to see every share on that computer and pick one, or type a share name (like `NAS-1TB-A` or `media/films`) to open straight into it. Leave the username blank to use your Windows sign-in, or enter an account on that computer (for another Windows PC, `COMPUTERNAME\\username` is the safest form).
+
+If a Windows computer over Tailscale can't be reached, its firewall is usually blocking file sharing because Windows treats the Tailscale network as Public. On that computer, allow **File and Printer Sharing** for Public networks, or set the Tailscale network to Private.
 
 **Keys:** choose your private key file in the site. OpenSSH keys and PuTTY `.ppk` keys both work. If the key has a passphrase you can save it, or leave it blank to be asked.
 

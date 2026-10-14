@@ -1,5 +1,13 @@
 # What's new
 
+## 1.3.2
+
+- **See every share on a network computer.** For a Network share site, leave **Share and folder** blank and TransferFTP opens on a list of all the computer's shared drives and folders, with the free space on each, just like typing \\\\computer in Explorer. Double-click one to open it. **Up** from any share goes back to the list.
+- Admin shares (C$, D$ and so on) show at the end of the list when **Show hidden files** is on. They need an administrator account on that computer.
+- Clearer messages when a network computer can't be reached or the sign-in is wrong, including the common Tailscale firewall problem.
+- The site form's hints now explain what to type for network shares.
+- The "Files at the same time" box in Sites lines up with the other fields.
+
 ## 1.3.1
 
 - **Fixed: "New connection..." and "New SSH connection..." showed a "Something went wrong" error** instead of opening the site form. They now open a blank site; fill it in and press **Open in new tab** or **Open terminal**.

@@ -164,6 +164,16 @@ namespace TransferFTP
             return result;
         }
 
+        /// <summary>
+        /// True at the "list of places" level: This PC's drive list, or the list of shares on a network computer.
+        /// Files can't be copied into these.
+        /// </summary>
+        public static bool IsTopList(FileSystem fs, string path)
+        {
+            if (fs is SmbFs smb) return smb.IsServerRoot(path);
+            return fs is LocalFs && string.IsNullOrEmpty(path);
+        }
+
         public static FileSystem For(Site site)
         {
             if (site == null) return new LocalFs();

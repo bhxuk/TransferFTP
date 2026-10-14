@@ -84,7 +84,7 @@ namespace TransferFTP
             var localBrowse = FlatButton.Secondary("Browse", BrowseLocal, "Choose local folder|Opens on the other side when you connect to this site");
             localBrowse.MinHeight = 34;
             _active = new CheckBox { Content = "Use active mode (only if passive doesn't work)" };
-            _parallel = new ComboBox { Width = 260 };
+            _parallel = new ComboBox { Width = 260, HorizontalAlignment = HorizontalAlignment.Left };
             _parallel.Items.Add("Same as Settings");
             foreach (var n in Settings.ParallelChoices) _parallel.Items.Add(n.ToString());
             _notes = new TextBox { Height = 70, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, VerticalContentAlignment = VerticalAlignment.Top, Padding = new Thickness(8, 6, 8, 6) };
@@ -240,7 +240,10 @@ namespace TransferFTP
             _sshOnly.Visibility = ssh ? Visibility.Visible : Visibility.Collapsed;
             _ftpOnly.Visibility = ftp ? Visibility.Visible : Visibility.Collapsed;
             _ftpWarning.Visibility = p == Protocol.FTP ? Visibility.Visible : Visibility.Collapsed;
-            _remoteLabel.Text = p == Protocol.SMB ? "Share and folder (e.g. media or media/films)" : "Start in folder";
+            _remoteLabel.Text = p == Protocol.SMB ? "Share and folder (optional, e.g. NAS-1TB-A or media/films)" : "Start in folder";
+            Hint.Set(_remote, p == Protocol.SMB ? "Leave blank to see every share on this computer" : "Leave blank for the home folder");
+            Hint.Set(_host, p == Protocol.SMB ? "Computer name or address, e.g. nas or nas.tailnet.ts.net" : "server.example.com or 192.168.1.10");
+            Hint.Set(_user, p == Protocol.SMB ? "Leave blank to use your Windows sign-in" : "");
             if (!_loading && int.TryParse(_port.Text, out int port) && Site.All.Any(x => Site.DefaultPort(x) == port))
                 _port.Text = Site.DefaultPort(p).ToString();
         }

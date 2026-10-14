@@ -404,8 +404,8 @@ namespace TransferFTP
             var a = _left;
             var b = _right;
             if (a.Fs == null || b.Fs == null) { Dialogs.Info("Sync", "Open a folder on both sides first."); return; }
-            if ((a.Fs is LocalFs && !(a.Fs is SmbFs) && string.IsNullOrEmpty(a.CurrentPath)) ||
-                (b.Fs is LocalFs && !(b.Fs is SmbFs) && string.IsNullOrEmpty(b.CurrentPath)))
+            if (FileSystem.IsTopList(a.Fs, a.CurrentPath) ||
+                FileSystem.IsTopList(b.Fs, b.CurrentPath))
             {
                 Dialogs.Info("Sync", "Open a folder on both sides (not the drive list), then compare them.");
                 return;

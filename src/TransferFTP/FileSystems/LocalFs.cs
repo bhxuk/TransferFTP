@@ -170,48 +170,128 @@ namespace TransferFTP
     }
 
     /// <summary>A Windows or NAS share, reached as \\host\share with optional sign-in.</summary>
+    /// <summary>
+    /// A Windows or NAS machine reached over SMB. With no share named, it opens on a list of the
+    /// machine's shares (like \\server in Explorer); with a share, it opens there and Up still goes back to the list.
+    /// </summary>
     public class SmbFs : LocalFs
     {
-        private readonly string _shareRoot;
+        private readonly string _server;      // \\host
+        private readonly string _shareRoot;   // \\host\share, or \\host when no share was given
         private bool _connected;
 
         public SmbFs(Site site)
         {
             Site = site;
+            string host = (site.Host ?? "").Trim().Trim('\\', '/');
+            if (host.StartsWith("smb://", StringComparison.OrdinalIgnoreCase)) host = host.Substring(6).Trim('/');
+            _server = @"\\" + host;
             string folder = (site.RemoteFolder ?? "").Replace('/', '\\').Trim('\\');
             string share = folder.Split('\\')[0];
-            _shareRoot = @"\\" + site.Host.Trim().TrimStart('\\') + "\\" + share;
-            Home = string.IsNullOrEmpty(folder) ? _shareRoot : @"\\" + site.Host.Trim().TrimStart('\\') + "\\" + folder;
+            _shareRoot = string.IsNullOrEmpty(share) ? _server : _server + "\\" + share;
+            Home = string.IsNullOrEmpty(folder) ? _shareRoot : _server + "\\" + folder;
         }
 
         public override string Title => Site.Name;
         public override bool IsConnected => _connected;
         public override bool IsLocal => false;
-        public override string Root => _shareRoot;
+        public override string Root => _server;
+
+        public bool IsServerRoot(string path) => string.Equals((path ?? "").TrimEnd('\\'), _server, StringComparison.OrdinalIgnoreCase);
 
         public override void Connect()
         {
-            if (string.IsNullOrWhiteSpace(Site.RemoteFolder))
-                throw new InvalidOperationException("Add the share name in the site's \"Share and folder\" box, for example media or media/films.");
+            if (_server.Length <= 2) throw new InvalidOperationException("Enter the computer's name or address in Host.");
             if (!string.IsNullOrEmpty(Site.User))
             {
-                string pwd = Passwords.Get(Site, "Password for " + Site.User + " on " + _shareRoot);
+                string pwd = Passwords.Get(Site, "Password for " + Site.User + " on " + _server);
                 if (pwd == null) throw new OperationCanceledException("Cancelled");
-                int r = Native.ConnectShare(_shareRoot, Site.User, pwd);
-                if (r != 0) throw new Win32Exception(r);
+                // Signing in to IPC$ sets up the session for every share on that machine.
+                int r = Native.ConnectShare(_server + "\\IPC$", Site.User, pwd);
+                if (r != 0 && _shareRoot != _server) r = Native.ConnectShare(_shareRoot, Site.User, pwd);
+                if (r != 0) throw new InvalidOperationException(Explain(r));
             }
-            if (!Directory.Exists(Home)) throw new DirectoryNotFoundException("Can't open " + Home);
+            if (IsServerRoot(Home)) Shares();   // throws with a clear message if the machine can't be reached
+            else if (!Directory.Exists(Home)) throw new DirectoryNotFoundException("Can't open " + Home + ". Check the share name is right.");
             _connected = true;
         }
 
+        private static string Explain(int code) => code switch
+        {
+            5 => "Access denied. Check the username and password. For a Windows PC, use an account on that PC (try COMPUTERNAME\\username).",
+            53 or 67 => "Can't find that computer or share. Check the name, and that file sharing is allowed through its firewall (Tailscale often counts as a Public network).",
+            86 or 1326 => "The username or password is wrong.",
+            1219 => "Windows is already signed in to this computer with a different account. Disconnect other connections to it (net use) and try again.",
+            1203 or 1231 => "The network path wasn't found. Check the computer is on and reachable, and that port 445 isn't blocked.",
+            _ => new Win32Exception(code).Message + " (error " + code + ")"
+        };
+
         public override string Parent(string path)
         {
-            if (string.IsNullOrEmpty(path)) return null;
-            if (string.Equals(path.TrimEnd('\\'), _shareRoot, StringComparison.OrdinalIgnoreCase)) return null;
+            if (string.IsNullOrEmpty(path) || IsServerRoot(path)) return null;
+            string p = path.TrimEnd('\\');
+            // \\host\share goes up to the list of shares.
+            if (p.Count(c => c == '\\') == 3) return _server;
             return base.Parent(path);
         }
 
-        public override List<FsItem> List(string path) => base.List(string.IsNullOrEmpty(path) ? _shareRoot : path);
+        public override List<FsItem> List(string path)
+        {
+            if (string.IsNullOrEmpty(path)) path = Home;
+            if (IsServerRoot(path)) return Shares();
+            return base.List(path);
+        }
+
+        public override SpaceInfo GetSpace(string path) => IsServerRoot(path) ? null : base.GetSpace(path);
+
+        public override FsItem Stat(string path) => IsServerRoot(path) ? new FsItem { Name = _server, FullPath = _server, IsDir = true } : base.Stat(path);
+
+        // ---------------- Listing shares ----------------
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        private struct SHARE_INFO_1
+        {
+            [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.LPWStr)] public string Name;
+            public uint Type;
+            [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.LPWStr)] public string Remark;
+        }
+
+        [System.Runtime.InteropServices.DllImport("Netapi32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        private static extern int NetShareEnum(string server, int level, out IntPtr buffer, int prefMaxLen, out int read, out int total, ref int resume);
+
+        [System.Runtime.InteropServices.DllImport("Netapi32.dll")]
+        private static extern int NetApiBufferFree(IntPtr buffer);
+
+        private List<FsItem> Shares()
+        {
+            int resume = 0;
+            int r = NetShareEnum(_server, 1, out IntPtr buf, -1, out int read, out _, ref resume);
+            if (r != 0 && r != 234) throw new InvalidOperationException("Couldn't list the shares on " + _server + ". " + Explain(r));
+            var items = new List<FsItem>();
+            try
+            {
+                int size = System.Runtime.InteropServices.Marshal.SizeOf<SHARE_INFO_1>();
+                for (int i = 0; i < read; i++)
+                {
+                    var info = System.Runtime.InteropServices.Marshal.PtrToStructure<SHARE_INFO_1>(buf + i * size);
+                    bool disk = (info.Type & 0xFF) == 0;            // folders and drives, not printers or IPC$
+                    bool special = (info.Type & 0x80000000) != 0;   // admin shares like C$
+                    if (!disk) continue;
+                    if (special && !Settings.Current.ShowHiddenFiles) continue;
+                    string full = _server + "\\" + info.Name;
+                    var item = new FsItem { Name = info.Name, FullPath = full, IsDir = true, IsDrive = true, Perms = info.Remark ?? "" };
+                    if (GetDiskFreeSpaceEx(full + "\\", out ulong free, out _, out _)) item.Size = (long)free;
+                    items.Add(item);
+                }
+            }
+            finally { if (buf != IntPtr.Zero) NetApiBufferFree(buf); }
+            // Normal shares first, then admin shares (C$, D$...).
+            return items.OrderBy(x => x.Name.EndsWith("$") ? 1 : 0).ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+        [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+        private static extern bool GetDiskFreeSpaceEx(string directory, out ulong freeToCaller, out ulong total, out ulong totalFree);
 
         public override FileSystem CreateSibling()
         {

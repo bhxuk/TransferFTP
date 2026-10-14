@@ -747,7 +747,7 @@ namespace TransferFTP
 
         private void UpdateStatus()
         {
-            bool driveList = Fs is LocalFs && !(Fs is SmbFs) && string.IsNullOrEmpty(CurrentPath);
+            bool driveList = FileSystem.IsTopList(Fs, CurrentPath);
             _sizeBtn.Visibility = _view == null || driveList || _items.All(i => !i.IsDir || i.IsParent) && !_sizing ? Visibility.Collapsed : Visibility.Visible;
             if (_view == null) { _status.Text = ""; return; }
             var real = _items.Where(i => !i.IsParent).ToList();
@@ -858,7 +858,7 @@ namespace TransferFTP
             var fs = Fs;
             string path = CurrentPath;
             int ticket = ++_spaceTicket;
-            if (fs == null || (fs is LocalFs && !(fs is SmbFs) && string.IsNullOrEmpty(path)) || (fs.Site != null && !fs.IsConnected))
+            if (fs == null || FileSystem.IsTopList(fs, path) || (fs.Site != null && !fs.IsConnected))
             {
                 _spaceBox.Visibility = Visibility.Collapsed;
                 return;
@@ -953,7 +953,7 @@ namespace TransferFTP
             why = null;
             if (Fs == null || Other?.Fs == null) { why = "Both sides need to be open."; return false; }
             if (Other.Fs.Site != null && !Other.Fs.IsConnected) { why = "The other side isn't connected."; return false; }
-            if (Other.Fs is LocalFs && string.IsNullOrEmpty(Other.CurrentPath) && !(Other.Fs is SmbFs)) { why = "Open a folder on the other side first (not the drive list)."; return false; }
+            if (FileSystem.IsTopList(Other.Fs, Other.CurrentPath)) { why = "Open a folder on the other side first (not the list of drives or shares)."; return false; }
             return true;
         }
 
@@ -970,7 +970,7 @@ namespace TransferFTP
 
         public void NewFolder()
         {
-            if (Fs == null || (Fs is LocalFs && string.IsNullOrEmpty(CurrentPath) && !(Fs is SmbFs))) return;
+            if (Fs == null || FileSystem.IsTopList(Fs, CurrentPath)) return;
             string name = Dialogs.Prompt("New folder", "Name for the new folder in " + CurrentPath, "New folder");
             if (string.IsNullOrWhiteSpace(name)) return;
             var fs = Fs;
@@ -1169,7 +1169,7 @@ namespace TransferFTP
             bool ours = e.Data.GetDataPresent(DragFormat);
             bool files = e.Data.GetDataPresent(DataFormats.FileDrop);
             string target = DropTarget(e);
-            bool driveList = Fs is LocalFs && !(Fs is SmbFs) && string.IsNullOrEmpty(target);
+            bool driveList = FileSystem.IsTopList(Fs, target);
             if (Fs != null && (ours || files) && !driveList && (Fs.Site == null || Fs.IsConnected))
             {
                 if (ours && e.Data.GetData(DragFormat) is DragPayload p && p.Pane == this && target == CurrentPath) e.Effects = DragDropEffects.None;
@@ -1183,7 +1183,7 @@ namespace TransferFTP
             e.Handled = true;
             if (Fs == null) return;
             string target = DropTarget(e);
-            if (Fs is LocalFs && !(Fs is SmbFs) && string.IsNullOrEmpty(target)) return;
+            if (FileSystem.IsTopList(Fs, target)) return;
             bool move = (e.KeyStates & DragDropKeyStates.ShiftKey) != 0;
             Activated?.Invoke(this);
             if (e.Data.GetData(DragFormat) is DragPayload p)
