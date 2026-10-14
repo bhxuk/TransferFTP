@@ -38,7 +38,7 @@ namespace TransferFTP
 
             var editor = UI.Input(s.EditorPath, double.NaN, "Windows default for each file type");
             editor.TextChanged += (o, e) => s.EditorPath = editor.Text.Trim().Trim('"');
-            var browse = FlatButton.Secondary("Browse", () =>
+            var browse = FlatButton.Secondary("Browse", tip: "Choose editor|Pick the program used to edit server files, such as VS Code or Notepad++", onClick: () =>
             {
                 var dlg = new OpenFileDialog { Title = "Choose an editor", Filter = "Programs|*.exe" };
                 if (dlg.ShowDialog(this) == true) editor.Text = dlg.FileName;
@@ -55,7 +55,7 @@ namespace TransferFTP
             var accent = UI.Combo(Theme.AccentNames, s.Accent, 160);
             accent.SelectionChanged += (o, e) => s.Accent = (string)accent.SelectedItem;
 
-            var openFolder = FlatButton.Secondary("Open settings folder", () =>
+            var openFolder = FlatButton.Secondary("Open settings folder", tip: "Settings folder|Open the folder with your settings, saved sites and log file", onClick: () =>
             {
                 try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Settings.Folder) { UseShellExecute = true }); } catch { }
             });
@@ -74,6 +74,7 @@ namespace TransferFTP
                     UI.Field("Edit remote files with", editorRow)),
                 Section("Sync",
                     UI.Field("Treat dates this many seconds apart as the same (use 60 for FTP servers that round to the minute)", tolerance)),
+                UpdatesSection(),
                 Section("Look",
                     UI.H(14, UI.Field("Theme", theme), UI.Field("Accent", accent)),
                     UI.Text("Theme changes apply next time TransferFTP starts.", 12, Theme.Muted)),
@@ -82,6 +83,33 @@ namespace TransferFTP
             body.Margin = new Thickness(24);
             Content = new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
             Closed += (o, e) => s.Save();
+        }
+
+        private Border UpdatesSection()
+        {
+            var s = Settings.Current;
+            var status = UI.Text("You're on version " + Updates.CurrentText + "." +
+                (Updates.Available ? " Version " + Updates.LatestVersion + " is ready to install." : ""), 13, Theme.Muted);
+            FlatButton update = null;
+            update = FlatButton.Primary(Updates.Available ? "Update to " + Updates.LatestVersion : "Check and update", async () =>
+            {
+                update.IsEnabled = false;
+                status.Text = "Checking GitHub for a new version...";
+                bool started = await Updates.Install(t => Dispatcher.BeginInvoke(new Action(() => status.Text = t == "You're on the latest version" ? "You're on the latest version (" + Updates.CurrentText + ")." : t)));
+                if (!started) update.IsEnabled = true;
+            }, "Update now|Checks for a new version and, if there is one, downloads it, installs it and reopens TransferFTP. One click.");
+            update.HorizontalAlignment = HorizontalAlignment.Left;
+            var notes = FlatButton.Secondary("What's new", () =>
+            {
+                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Updates.LatestNotesUrl) { UseShellExecute = true }); } catch { }
+            }, "What's new|Open the release notes on GitHub");
+            var check = new CheckBox { Content = "Check for updates automatically", IsChecked = s.CheckForUpdates };
+            check.Click += (o, e) => s.CheckForUpdates = check.IsChecked == true;
+            Tips.Set(check, "Check automatically|Look for a new version when TransferFTP starts and every few hours. An Update button appears at the top when one is out");
+            var auto = new CheckBox { Content = "Install updates automatically", IsChecked = s.InstallUpdatesAutomatically };
+            auto.Click += (o, e) => s.InstallUpdatesAutomatically = auto.IsChecked == true;
+            Tips.Set(auto, "Install automatically|Update as soon as a new version is found, but only when nothing is transferring or being edited");
+            return Section("Updates", status, UI.H(10, update, notes), check, auto);
         }
 
         private static Border Section(string title, params UIElement[] children)

@@ -48,12 +48,12 @@ namespace TransferFTP
             _state.VerticalAlignment = VerticalAlignment.Center;
             var bar = new DockPanel { Margin = new Thickness(12, 8, 12, 8) };
             var buttons = UI.H(4,
-                FlatButton.Tool(Icons.Close, "Ctrl+C", "Send Ctrl+C (stop the running command)", () => { Send("\x03"); _view.Focus(); }),
-                FlatButton.Tool(Icons.Copy, "Paste", "Paste (Ctrl+V, or right-click)", () => { _view.Paste(); _view.Focus(); }),
-                FlatButton.Tool(Icons.Plus, null, "Bigger text (Ctrl +)", () => { _view.FontSizePoints += 1; _view.Focus(); }),
-                FlatButton.Tool(Icons.Minus, null, "Smaller text (Ctrl -)", () => { _view.FontSizePoints -= 1; _view.Focus(); }),
-                FlatButton.Tool(Icons.Terminal, "Windows Terminal", "Open this server in Windows Terminal", OpenExternal),
-                FlatButton.Tool(Icons.Refresh, "Reconnect", "Reconnect", Start));
+                FlatButton.Tool(Icons.Close, "Ctrl+C", "Stop command|Send Ctrl+C to stop whatever is running", () => { Send("\x03"); _view.Focus(); }),
+                FlatButton.Tool(Icons.Copy, "Paste", "Paste|Paste from the clipboard. Right-click does the same (Ctrl+V)", () => { _view.Paste(); _view.Focus(); }),
+                FlatButton.Tool(Icons.Plus, null, "Bigger text|Make the terminal text larger (Ctrl+Plus)", () => { _view.FontSizePoints += 1; _view.Focus(); }),
+                FlatButton.Tool(Icons.Minus, null, "Smaller text|Make the terminal text smaller (Ctrl+Minus)", () => { _view.FontSizePoints -= 1; _view.Focus(); }),
+                FlatButton.Tool(Icons.Terminal, "Windows Terminal", "Windows Terminal|Open the same server in Windows Terminal instead", OpenExternal),
+                FlatButton.Tool(Icons.Refresh, "Reconnect", "Reconnect|Start a fresh session on this server", Start));
             DockPanel.SetDock(buttons, Dock.Right);
             bar.Children.Add(buttons);
             bar.Children.Add(UI.H(10, UI.Icon(Icons.Terminal, 16, Theme.Accent), UI.Text(site.User + "@" + site.Host, 13, Theme.Text, FontWeights.SemiBold), _state));

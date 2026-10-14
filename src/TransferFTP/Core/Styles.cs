@@ -118,15 +118,20 @@ namespace TransferFTP
     <Setter Property='CaretBrush' Value='{TEXT}'/>
     <Setter Property='SelectionBrush' Value='{ACCENT}'/>
     <Setter Property='BorderThickness' Value='1'/>
-    <Setter Property='Padding' Value='8,0'/>
+    <Setter Property='Padding' Value='10,0'/>
     <Setter Property='VerticalContentAlignment' Value='Center'/>
     <Setter Property='Template'>
       <Setter.Value>
         <ControlTemplate TargetType='TextBox'>
           <Border x:Name='bd' Background='{TemplateBinding Background}' BorderBrush='{TemplateBinding BorderBrush}' BorderThickness='{TemplateBinding BorderThickness}' CornerRadius='8' SnapsToDevicePixels='True'>
-            <ScrollViewer x:Name='PART_ContentHost' Margin='{TemplateBinding Padding}' VerticalAlignment='{TemplateBinding VerticalContentAlignment}' Focusable='False'/>
+            <Grid>
+              <TextBlock x:Name='hint' Text='{TemplateBinding Tag}' Foreground='{MUTED}' Margin='{TemplateBinding Padding}' Padding='2,0,0,0'
+                         VerticalAlignment='{TemplateBinding VerticalContentAlignment}' IsHitTestVisible='False' Visibility='Collapsed' TextTrimming='CharacterEllipsis'/>
+              <ScrollViewer x:Name='PART_ContentHost' Margin='{TemplateBinding Padding}' VerticalAlignment='{TemplateBinding VerticalContentAlignment}' Focusable='False'/>
+            </Grid>
           </Border>
           <ControlTemplate.Triggers>
+            <Trigger Property='Text' Value=''><Setter TargetName='hint' Property='Visibility' Value='Visible'/></Trigger>
             <Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='bd' Property='BorderBrush' Value='{ACCENT}'/></Trigger>
             <Trigger Property='IsEnabled' Value='False'><Setter TargetName='bd' Property='Opacity' Value='0.5'/></Trigger>
           </ControlTemplate.Triggers>
@@ -141,7 +146,7 @@ namespace TransferFTP
     <Setter Property='CaretBrush' Value='{TEXT}'/>
     <Setter Property='SelectionBrush' Value='{ACCENT}'/>
     <Setter Property='BorderThickness' Value='1'/>
-    <Setter Property='Padding' Value='8,0'/>
+    <Setter Property='Padding' Value='10,0'/>
     <Setter Property='VerticalContentAlignment' Value='Center'/>
     <Setter Property='Template'>
       <Setter.Value>
@@ -254,8 +259,12 @@ namespace TransferFTP
     <Setter Property='Template'>
       <Setter.Value>
         <ControlTemplate TargetType='ToolTip'>
-          <Border Background='{POPUP}' BorderBrush='{LINE}' BorderThickness='1' CornerRadius='8' Padding='10,6'>
-            <ContentPresenter TextElement.FontSize='12'/>
+          <Border Background='{POPUP}' BorderBrush='{LINE}' BorderThickness='1' CornerRadius='10' Padding='12,8' MaxWidth='340'>
+            <ContentPresenter TextElement.FontSize='12.5'>
+              <ContentPresenter.Resources>
+                <Style TargetType='TextBlock'><Setter Property='TextWrapping' Value='Wrap'/></Style>
+              </ContentPresenter.Resources>
+            </ContentPresenter>
           </Border>
         </ControlTemplate>
       </Setter.Value>

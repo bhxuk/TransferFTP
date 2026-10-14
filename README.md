@@ -31,7 +31,7 @@ with folder sync you can preview, edit-and-save-back, server-to-server copies an
 | **SSH terminal** | A terminal window for any SFTP or SCP site, opening in the folder you're looking at. One click hands off to Windows Terminal for vim or htop. |
 | **Safe by default** | Passwords are encrypted with Windows (DPAPI), server keys are checked and remembered, certificate problems are shown before you trust them. |
 
-Also: permissions (chmod) with tick boxes, filter as you type, natural sorting, back and up history, import from FileZilla, light and dark themes with six accent colours.
+Also: one-click updates from inside the app, hover help on every button, permissions (chmod) with tick boxes, filter as you type, natural sorting, back and up history, import from FileZilla, light and dark themes with six accent colours.
 
 ## A quick look
 
@@ -65,10 +65,10 @@ Needs Windows 10 (version 2004 or later) or Windows 11, 64-bit. Everything it ne
 | Backspace, Alt+Left | Up a folder, back |
 | Tab | Switch sides |
 | Ctrl+L, Ctrl+F, Ctrl+R | Path box, filter, refresh |
-| Ctrl+T, Ctrl+W, Ctrl+Tab | New tab, close tab, next tab |
+| Ctrl+T, Ctrl+W, Ctrl+Tab | New tab (asks where), close tab, next tab |
 | Ctrl+N | New window |
 | Ctrl+D | Add this folder to quick links |
-| Ctrl+S, F9 | Sites, terminal |
+| Ctrl+S, F9 | Sites, terminal (asks which server) |
 
 ## Where things are kept
 

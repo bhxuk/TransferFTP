@@ -1,5 +1,14 @@
 # What's new
 
+## 1.2.0
+
+- **One-click updates.** When a new version is out, an **Update** button appears at the top of the window. One click downloads it, installs it and reopens TransferFTP with your tabs as they were. **Settings > Updates** has a **Check and update** button, and you can choose to install updates automatically.
+- **New tabs ask where to open.** The **+** button and Ctrl+T now let you pick This PC, the same place as the current tab, any saved site, a quick link, or a new connection. Search to find a site quickly.
+- **Terminal asks which server.** The **Terminal** button at the top (and F9) lets you choose any saved SFTP or SCP server, or add a new one. The terminal button inside a connected side still opens straight onto that server.
+- **Hover help on every button.** Every button now explains what it does, with its keyboard shortcut.
+- **Neater filter box,** with a search icon, proper spacing and a clear button. Esc clears it.
+- Text boxes across the app have more breathing room for their placeholder text.
+
 ## 1.1.2
 
 - **4 files at a time by default** instead of 2. If you were still on the old default, you're moved to 4 automatically.

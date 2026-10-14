@@ -25,8 +25,15 @@ namespace TransferFTP
         private Site _editing;
         private bool _loading;
 
-        public SiteManagerWindow(Site select = null)
+        private readonly System.Collections.Generic.HashSet<string> _created = new System.Collections.Generic.HashSet<string>();
+        private readonly Action<Site> _action;
+
+        /// <param name="startNew">Open with a fresh site ready to fill in.</param>
+        /// <param name="actionLabel">When set, the left/right buttons are replaced by one button that saves and runs the action.</param>
+        public SiteManagerWindow(Site select = null, bool startNew = false, Protocol newProtocol = Protocol.SFTP,
+            string actionLabel = null, string actionTip = null, Action<Site> action = null)
         {
+            _action = action;
             Title = "Sites";
             Width = 980;
             Height = 700;
@@ -42,10 +49,10 @@ namespace TransferFTP
                 "<TextBlock Text='{Binding Summary}' Foreground='{MUTED}' FontSize='12' TextTrimming='CharacterEllipsis' Margin='0,2,0,0'/>" +
                 "</StackPanel>");
 
-            var addBtn = FlatButton.Tool(Icons.Plus, "New", "Add a site", NewSite);
-            var dupBtn = FlatButton.Tool(Icons.Copy, null, "Duplicate", Duplicate);
-            var delBtn = FlatButton.Tool(Icons.Trash, null, "Delete site", DeleteSite);
-            var importBtn = FlatButton.Tool(Icons.Download, "Import", "Import sites", ShowImportMenu);
+            var addBtn = FlatButton.Tool(Icons.Plus, "New", "New site|Add a server or network share", NewSite);
+            var dupBtn = FlatButton.Tool(Icons.Copy, null, "Duplicate|Make a copy of the selected site to edit", Duplicate);
+            var delBtn = FlatButton.Tool(Icons.Trash, null, "Delete site|Remove the saved site and its password. Files on the server aren't touched", DeleteSite);
+            var importBtn = FlatButton.Tool(Icons.Download, "Import", "Import and export|Bring in sites from FileZilla or an export file, or export yours", ShowImportMenu);
             var listTools = UI.H(2, addBtn, dupBtn, delBtn, importBtn);
             var sidebar = new DockPanel { Width = 290, Margin = new Thickness(16, 16, 0, 16) };
             var sideTitle = UI.Text("Sites", 20, Theme.Text, FontWeights.SemiBold, true);
@@ -68,13 +75,13 @@ namespace TransferFTP
             _rememberPwd = new CheckBox { Content = "Remember password (encrypted for your Windows account)" };
             _pwdHint = UI.Text("", 12, Theme.Muted);
             _keyFile = UI.Input("", double.NaN, "Optional. OpenSSH or PuTTY key");
-            var keyBrowse = FlatButton.Secondary("Browse", BrowseKey);
+            var keyBrowse = FlatButton.Secondary("Browse", BrowseKey, "Choose key file|Pick your private key, such as id_ed25519 or a PuTTY .ppk");
             keyBrowse.MinHeight = 34;
             _passphrase = UI.Password();
             _remoteLabel = UI.Text("Start in folder", 12, Theme.Muted, FontWeights.SemiBold);
             _remote = UI.Input("", double.NaN, "Leave blank for the home folder");
             _local = UI.Input("", double.NaN, "Optional. Opens on the other side");
-            var localBrowse = FlatButton.Secondary("Browse", BrowseLocal);
+            var localBrowse = FlatButton.Secondary("Browse", BrowseLocal, "Choose local folder|Opens on the other side when you connect to this site");
             localBrowse.MinHeight = 34;
             _active = new CheckBox { Content = "Use active mode (only if passive doesn't work)" };
             _parallel = new ComboBox { Width = 260 };
@@ -90,11 +97,17 @@ namespace TransferFTP
             _testResult = UI.Text("", 13, Theme.Muted);
             _ftpWarning = Dialogs.WarningNote(Passwords.PlainFtpWarning);
 
-            var save = FlatButton.Primary("Save", () => Save(true));
-            var test = FlatButton.Secondary("Test connection", Test);
-            var left = FlatButton.Secondary("Open on left", () => SaveAndConnect("left"));
-            var right = FlatButton.Secondary("Open on right", () => SaveAndConnect("right"));
+            var save = FlatButton.Primary("Save", () => Save(true), "Save|Keep the changes to this site");
+            var test = FlatButton.Secondary("Test connection", Test, "Test connection|Try signing in with these details without saving");
+            var left = FlatButton.Secondary("Open on left", () => SaveAndConnect("left"), "Open on left|Save, then connect to this site in the left side");
+            var right = FlatButton.Secondary("Open on right", () => SaveAndConnect("right"), "Open on right|Save, then connect to this site in the right side");
             var buttons = UI.H(10, test, left, right, save);
+            if (action != null)
+            {
+                var go = FlatButton.Primary(actionLabel ?? "Connect", SaveAndRun, actionTip);
+                save = FlatButton.Secondary("Save", () => Save(true), "Save|Keep the changes to this site");
+                buttons = UI.H(10, test, save, go);
+            }
 
             _form = UI.V(14,
                 UI.Field("Name", _name),
@@ -132,6 +145,28 @@ namespace TransferFTP
             Content = root;
 
             Reload(select?.Id ?? SiteStore.All.OrderByDescending(s => s.LastUsed).FirstOrDefault()?.Id);
+            if (startNew) Loaded += (s, e) => NewSite(newProtocol);
+
+            // Sites added here but never filled in are tidied away when the window closes.
+            Closed += (s, e) =>
+            {
+                bool removed = false;
+                foreach (var id in _created)
+                {
+                    var site = SiteStore.Find(id);
+                    if (site != null && string.IsNullOrWhiteSpace(site.Host)) { SiteStore.All.Remove(site); removed = true; }
+                }
+                if (removed) SiteStore.Save();
+            };
+        }
+
+        private void SaveAndRun()
+        {
+            if (_editing == null) return;
+            if (!Save(true)) return;
+            var site = SiteStore.Find(_editing.Id);
+            Close();
+            _action?.Invoke(site);
         }
 
         private static Grid Row2(UIElement a, UIElement b, double bWidth)
@@ -286,9 +321,12 @@ namespace TransferFTP
             Close();
         }
 
-        private void NewSite()
+        private void NewSite() => NewSite(Protocol.SFTP);
+
+        private void NewSite(Protocol protocol)
         {
-            var s = new Site { Name = "New site" };
+            var s = new Site { Name = "New site", Protocol = protocol, Port = Site.DefaultPort(protocol) };
+            _created.Add(s.Id);
             SiteStore.Upsert(s);
             Reload(s.Id);
             _name.Focus();

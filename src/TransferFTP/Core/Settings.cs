@@ -41,6 +41,14 @@ namespace TransferFTP
         /// <summary>Seconds of clock difference that sync treats as "the same time".</summary>
         public int SyncToleranceSeconds { get; set; } = 2;
 
+        /// <summary>Look for a new version at start-up and every few hours.</summary>
+        public bool CheckForUpdates { get; set; } = true;
+
+        /// <summary>Install new versions as soon as they're found, without asking (only when nothing is transferring).</summary>
+        public bool InstallUpdatesAutomatically { get; set; }
+
+        public DateTime LastUpdateCheck { get; set; }
+
         /// <summary>Warn before saving a password for a plain (unencrypted) FTP site.</summary>
         public bool WarnPlainFtp { get; set; } = true;
 

@@ -211,25 +211,123 @@ namespace TransferFTP
             => new GridViewColumn { Header = header, Width = width, CellTemplate = Template(body) };
     }
 
-    /// <summary>Grey placeholder text shown in an empty text box.</summary>
+    /// <summary>Grey placeholder text shown in an empty text box (drawn by the TextBox template from Tag).</summary>
     public static class Hint
     {
-        public static void Set(TextBox box, string hint)
+        public static void Set(TextBox box, string hint) => box.Tag = hint;
+    }
+
+    /// <summary>
+    /// Hover help. A tip is written "Title|What it does (Shortcut)": the title shows in bold,
+    /// the rest underneath, and the shortcut as a key cap.
+    /// </summary>
+    public static class Tips
+    {
+        public static object Make(string spec)
         {
-            var vb = new VisualBrush
+            if (string.IsNullOrWhiteSpace(spec)) return null;
+            string title = spec, detail = null, keys = null;
+            int bar = spec.IndexOf('|');
+            if (bar >= 0) { title = spec.Substring(0, bar).Trim(); detail = spec.Substring(bar + 1).Trim(); }
+            // A shortcut in brackets at the end of the title or detail becomes a key cap.
+            string ExtractKeys(ref string s)
             {
-                Stretch = Stretch.None,
-                AlignmentX = AlignmentX.Left,
-                AlignmentY = AlignmentY.Center,
-                Visual = new TextBlock { Text = hint, Foreground = Theme.Muted, FontSize = box.FontSize, Margin = new Thickness(10, 0, 0, 0), FontFamily = Theme.Font }
-            };
-            void Update()
-            {
-                box.Background = string.IsNullOrEmpty(box.Text) ? (Brush)vb : Theme.Subtle;
+                if (s == null || !s.EndsWith(")")) return null;
+                int open = s.LastIndexOf('(');
+                if (open < 0) return null;
+                string inner = s.Substring(open + 1, s.Length - open - 2);
+                bool looksLikeKey = inner.Length <= 22 && (inner.Contains("Ctrl") || inner.Contains("Alt") || inner.Contains("Shift") ||
+                    (inner.Length <= 3 && inner.StartsWith("F")) || inner == "Backspace" || inner == "Del" || inner == "Enter" || inner == "Tab");
+                if (!looksLikeKey) return null;
+                s = s.Substring(0, open).TrimEnd();
+                return inner;
             }
-            box.TextChanged += (s, e) => Update();
-            box.Loaded += (s, e) => Update();
-            Update();
+            keys = ExtractKeys(ref title) ?? ExtractKeys(ref detail);
+
+            var head = new DockPanel();
+            if (keys != null)
+            {
+                var cap = new Border
+                {
+                    Background = Theme.Subtle, BorderBrush = Theme.Line, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(5),
+                    Padding = new Thickness(6, 1, 6, 1), Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center,
+                    Child = new TextBlock { Text = keys, FontSize = 11.5, FontWeight = FontWeights.SemiBold, Foreground = Theme.Text }
+                };
+                DockPanel.SetDock(cap, Dock.Right);
+                head.Children.Add(cap);
+            }
+            head.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, Foreground = Theme.Text, TextWrapping = TextWrapping.Wrap });
+            if (string.IsNullOrEmpty(detail)) return head;
+            var body = new TextBlock { Text = detail, Foreground = Theme.Muted, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 3, 0, 0) };
+            var stack = new StackPanel();
+            stack.Children.Add(head);
+            stack.Children.Add(body);
+            return stack;
+        }
+
+        public static T Set<T>(T element, string spec) where T : FrameworkElement
+        {
+            element.ToolTip = Make(spec);
+            if (element.ToolTip != null)
+            {
+                int bar = spec.IndexOf('|');
+                System.Windows.Automation.AutomationProperties.SetHelpText(element, spec.Replace("|", ". "));
+                if (string.IsNullOrEmpty(System.Windows.Automation.AutomationProperties.GetName(element)))
+                    System.Windows.Automation.AutomationProperties.SetName(element, bar > 0 ? spec.Substring(0, bar) : spec);
+            }
+            return element;
+        }
+    }
+
+    /// <summary>A search-style box: magnifier icon, placeholder and a clear button, with room to breathe.</summary>
+    public class SearchBox : Border
+    {
+        public TextBox Box { get; }
+        private readonly FlatButton _clear;
+
+        public SearchBox(string hint, double width)
+        {
+            Width = width;
+            Height = 32;
+            Background = Theme.Subtle;
+            BorderBrush = Theme.Line;
+            BorderThickness = new Thickness(1);
+            CornerRadius = new CornerRadius(8);
+            Cursor = Cursors.IBeam;
+            var icon = UI.Icon(Icons.Search, 14, Theme.Muted);
+            icon.Margin = new Thickness(10, 0, 2, 0);
+            icon.VerticalAlignment = VerticalAlignment.Center;
+            Box = new TextBox
+            {
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(4, 0, 4, 0),
+                Height = 30,
+                FontSize = 13,
+                Tag = hint,
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
+            _clear = new FlatButton
+            {
+                Content = UI.Icon(Icons.Close, 10, Theme.Muted, 2.2),
+                Width = 22, Height = 22, MinHeight = 22, Padding = new Thickness(0),
+                Background = Brushes.Transparent, CornerRadius = new CornerRadius(11),
+                Margin = new Thickness(0, 0, 5, 0), Visibility = Visibility.Collapsed, Focusable = false
+            };
+            Tips.Set(_clear, "Clear the filter|Show every file again (Esc)");
+            _clear.Click += (s, e) => { Box.Text = ""; Box.Focus(); };
+            Box.TextChanged += (s, e) => _clear.Visibility = Box.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+            Box.KeyDown += (s, e) => { if (e.Key == Key.Escape && Box.Text.Length > 0) { Box.Text = ""; e.Handled = true; } };
+            Box.GotKeyboardFocus += (s, e) => BorderBrush = Theme.Accent;
+            Box.LostKeyboardFocus += (s, e) => BorderBrush = Theme.Line;
+            MouseLeftButtonDown += (s, e) => { Box.Focus(); };
+            var dock = new DockPanel();
+            DockPanel.SetDock(icon, Dock.Left);
+            DockPanel.SetDock(_clear, Dock.Right);
+            dock.Children.Add(icon);
+            dock.Children.Add(_clear);
+            dock.Children.Add(Box);
+            Child = dock;
         }
     }
 
@@ -307,14 +405,15 @@ namespace TransferFTP
             FocusVisualStyle = null;
         }
 
-        public static FlatButton Primary(string text, Action onClick = null)
+        public static FlatButton Primary(string text, Action onClick = null, string tip = null)
         {
             var b = new FlatButton { Content = text, Background = Theme.Accent, Foreground = Theme.Dark, MinHeight = 38, Padding = new Thickness(18, 0, 18, 0) };
+            if (tip != null) Tips.Set(b, tip);
             if (onClick != null) b.Click += (s, e) => onClick();
             return b;
         }
 
-        public static FlatButton Secondary(string text, Action onClick = null)
+        public static FlatButton Secondary(string text, Action onClick = null, string tip = null)
         {
             var b = new FlatButton
             {
@@ -323,6 +422,7 @@ namespace TransferFTP
                 BorderBrush = Theme.Brush(Theme.IsLight ? Color.FromArgb(0x30, 0, 0, 0) : Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF)),
                 MinHeight = 38
             };
+            if (tip != null) Tips.Set(b, tip);
             if (onClick != null) b.Click += (s, e) => onClick();
             return b;
         }
@@ -336,13 +436,13 @@ namespace TransferFTP
             var b = new FlatButton
             {
                 Content = content,
-                ToolTip = tooltip,
                 Background = Brushes.Transparent,
                 Padding = string.IsNullOrEmpty(text) ? new Thickness(0) : new Thickness(10, 0, 12, 0),
                 MinWidth = 34,
                 Height = 34
             };
-            System.Windows.Automation.AutomationProperties.SetName(b, tooltip ?? text);
+            System.Windows.Automation.AutomationProperties.SetName(b, text ?? (tooltip ?? "").Split('|')[0]);
+            Tips.Set(b, tooltip);
             if (onClick != null) b.Click += (s, e) => onClick();
             return b;
         }

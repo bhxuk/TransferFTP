@@ -24,6 +24,15 @@ namespace TransferFTP
 
         public event Action<FilePane> CurrentChanged;
 
+        /// <summary>Shows the "where should the new tab open?" picker. Without it, new tabs copy the current one.</summary>
+        public Action<PaneSide> NewTabPrompt;
+
+        public void NewTab()
+        {
+            if (NewTabPrompt != null) NewTabPrompt(this);
+            else Duplicate();
+        }
+
         private readonly StackPanel _strip;
         private readonly ScrollViewer _stripScroll;
         private readonly Grid _host;
@@ -32,7 +41,7 @@ namespace TransferFTP
         {
             Side = side;
             _strip = new StackPanel { Orientation = Orientation.Horizontal };
-            var add = FlatButton.Tool(Icons.Plus, null, "New tab (Ctrl+T)", () => Duplicate());
+            var add = FlatButton.Tool(Icons.Plus, null, "New tab|Choose This PC, a saved site or a quick link to open in a new tab (Ctrl+T)", NewTab);
             add.Height = 30;
             add.MinWidth = 30;
             add.Margin = new Thickness(2, 0, 0, 0);
@@ -155,7 +164,7 @@ namespace TransferFTP
                     Content = UI.Icon(Icons.Close, 10, Theme.Muted, 2.2),
                     Width = 20, Height = 20, MinHeight = 20, Padding = new Thickness(0),
                     Background = Brushes.Transparent, CornerRadius = new CornerRadius(10),
-                    ToolTip = "Close tab (Ctrl+W)",
+                    ToolTip = Tips.Make("Close tab (Ctrl+W)"),
                     Visibility = Tabs.Count > 1 ? Visibility.Visible : Visibility.Collapsed
                 };
                 close.Click += (s, e) => { CloseTab(tab); e.Handled = true; };
@@ -171,7 +180,7 @@ namespace TransferFTP
                     Height = 30,
                     Child = content,
                     Cursor = Cursors.Hand,
-                    ToolTip = tab.Fs?.Site == null ? tab.CurrentPath : tab.Fs.Site.Name + "  " + tab.CurrentPath,
+                    ToolTip = Tips.Make((tab.Fs?.Site == null ? "This PC" : tab.Fs.Site.Name) + "|" + (string.IsNullOrEmpty(tab.CurrentPath) ? "Drives and folders" : tab.CurrentPath) + "\nMiddle-click to close, right-click for more"),
                     AllowDrop = true
                 };
                 chip.MouseLeftButtonUp += (s, e) => { Select(tab); tab.FocusList(); };
@@ -192,7 +201,8 @@ namespace TransferFTP
                 mi.Click += (s, e) => a();
                 m.Items.Add(mi);
             }
-            Item("Duplicate tab", "Ctrl+T", () => { Select(tab); Duplicate(); });
+            Item("New tab...", "Ctrl+T", NewTab);
+            Item("Duplicate tab", null, () => { Select(tab); Duplicate(); });
             Item("Close tab", "Ctrl+W", () => CloseTab(tab), Tabs.Count > 1);
             Item("Close other tabs", null, () => { foreach (var t in Tabs.Where(x => x != tab).ToList()) CloseTab(t); }, Tabs.Count > 1);
             m.Items.Add(new Separator());

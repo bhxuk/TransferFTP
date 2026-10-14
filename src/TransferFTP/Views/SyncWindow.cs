@@ -104,7 +104,7 @@ namespace TransferFTP
             _subfolders = new CheckBox { Content = "Include subfolders", IsChecked = true, VerticalAlignment = VerticalAlignment.Center };
             _deleteExtra = new CheckBox { Content = "Delete files that only exist on the target", IsChecked = false, VerticalAlignment = VerticalAlignment.Center };
             _ignore = UI.Input(".git;node_modules;Thumbs.db;.DS_Store;*.tmp", 300);
-            _scan = FlatButton.Primary("Compare", Scan);
+            _scan = FlatButton.Primary("Compare", Scan, "Compare|Look through both folders and list what's different. Nothing is copied yet");
             var options = new WrapPanel();
             foreach (var el in new UIElement[]
             {
@@ -136,9 +136,9 @@ namespace TransferFTP
             _summary.VerticalAlignment = VerticalAlignment.Center;
             _showSame = new CheckBox { Content = "Show identical files", VerticalAlignment = VerticalAlignment.Center };
             _showSame.Click += (s, e) => _view?.Refresh();
-            _run = FlatButton.Primary("Sync", Run);
+            _run = FlatButton.Primary("Sync", Run, "Sync|Copy, create and delete the ticked items. They go into the transfer queue");
             _run.IsEnabled = false;
-            var close = FlatButton.Secondary("Close", Close);
+            var close = FlatButton.Secondary("Close", Close, "Close|Close without changing anything");
             var bottom = new DockPanel { Margin = new Thickness(0, 12, 0, 0) };
             var bottomRight = UI.H(10, _showSame, close, _run);
             DockPanel.SetDock(bottomRight, Dock.Right);

@@ -19,6 +19,10 @@ namespace TransferFTP
         public App()
         {
             ShutdownMode = ShutdownMode.OnLastWindowClose;
+            // Hover help shows quickly, stays long enough to read, and works on greyed-out buttons too.
+            System.Windows.Controls.ToolTipService.InitialShowDelayProperty.OverrideMetadata(typeof(FrameworkElement), new FrameworkPropertyMetadata(350));
+            System.Windows.Controls.ToolTipService.ShowDurationProperty.OverrideMetadata(typeof(FrameworkElement), new FrameworkPropertyMetadata(20000));
+            System.Windows.Controls.ToolTipService.ShowOnDisabledProperty.OverrideMetadata(typeof(FrameworkElement), new FrameworkPropertyMetadata(true));
             DispatcherUnhandledException += OnUiError;
             AppDomain.CurrentDomain.UnhandledException += (s, e) => Log.Write("Fatal: " + e.ExceptionObject);
             System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (s, e) => { Log.Write("Task: " + e.Exception); e.SetObserved(); };
@@ -32,6 +36,7 @@ namespace TransferFTP
             var w = new MainWindow();
             MainWindow = w;
             w.Show();
+            Updates.StartBackgroundChecks();
         }
 
         private void OnUiError(object sender, DispatcherUnhandledExceptionEventArgs e)

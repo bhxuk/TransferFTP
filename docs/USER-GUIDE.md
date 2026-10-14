@@ -32,7 +32,8 @@ For a **network share**, put the server in Host and the share in **Share and fol
 
 Each side can hold several tabs, so you can keep a few servers or folders open at once.
 
-- **Ctrl+T** or the **+** after the tabs opens a new tab at the same place as the current one.
+- **Ctrl+T** or the **+** after the tabs opens a new tab. You choose what it opens: **This PC**, **Same as this tab**, any saved site, a quick link, or **New connection...** to add a site and open it straight away. Type to search the list.
+- Right-click a tab and choose **Duplicate tab** to copy it without asking.
 - **Ctrl+W**, the **x** on a tab, or a middle-click closes it.
 - **Ctrl+Tab** and **Ctrl+Shift+Tab** move between tabs on the side you're using.
 - Right-click a folder and choose **Open in new tab**.
@@ -104,7 +105,9 @@ To always use one editor, such as VS Code or Notepad++, choose it in **Settings 
 
 ## Terminal
 
-For SFTP and SCP sites, press **Terminal** (or **F9**). It opens in the folder you're looking at, in full colour, and works with full-screen programs like nano, vim, htop and less.
+Press **Terminal** at the top (or **F9**) and choose which server to open it on: any saved SFTP or SCP site, or **New SSH connection...** to add one. The server you're looking at is already selected, so pressing Enter opens it. The small terminal button inside a connected side opens straight onto that server.
+
+The terminal opens in the folder you're looking at, in full colour, and works with full-screen programs like nano, vim, htop and less.
 
 - **Ctrl+C** stops the running command. With text selected it copies instead.
 - **Select** text by dragging; double-click selects a word. **Right-click** copies the selection, or pastes when nothing is selected. **Ctrl+Shift+C** copies, **Ctrl+V** or **Shift+Insert** pastes.
@@ -137,6 +140,20 @@ In **Sites**, press **Import**:
 | Edit remote files with | Your editor, or the Windows default |
 | Date tolerance | How far apart two dates can be and still count as the same |
 | Theme and accent | Dark, light or follow Windows, plus six colours |
+
+## Updates
+
+When a new version is out, an **Update to x.x.x** button appears at the top of the window. Click it once: TransferFTP downloads the new version, installs it and reopens with your tabs as they were. If transfers are running it asks first.
+
+In **Settings > Updates**:
+
+- **Check and update** checks GitHub and, if there's a new version, installs it in the same click.
+- **Check for updates automatically** looks when TransferFTP starts and every few hours (on by default).
+- **Install updates automatically** updates without asking, but only while nothing is transferring or being edited.
+
+## Hover help
+
+Hold the mouse over any button to see what it does and its keyboard shortcut.
 
 ## Troubleshooting
 

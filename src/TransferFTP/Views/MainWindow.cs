@@ -35,6 +35,7 @@ namespace TransferFTP
         private readonly ListBox _log;
         private readonly ObservableCollection<LogLine> _logLines = new ObservableCollection<LogLine>();
         private readonly TextBlock _queueSummary;
+        private readonly FlatButton _updateBtn;
         private readonly FlatButton _pauseAll;
         private readonly FlatButton _tabTransfers, _tabEdits, _tabLog;
         private readonly Grid _bottomHost;
@@ -66,14 +67,25 @@ namespace TransferFTP
             var logo = UI.H(10, new Image { Source = Theme.AppIcon(), Width = 26, Height = 26 }, UI.Text("TransferFTP", 18, Theme.Text, FontWeights.Bold, true));
             logo.VerticalAlignment = VerticalAlignment.Center;
             var actions = UI.H(4,
-                FlatButton.Tool(Icons.Server, "Sites", "Saved sites (Ctrl+S)", () => OpenSites(null)),
-                FlatButton.Tool(Icons.Sync, "Sync", "Compare and sync the two folders", () => OpenSync(_active ?? _left)),
-                FlatButton.Tool(Icons.Terminal, "Terminal", "SSH terminal for the active side (F9)", () => OpenTerminal(_active ?? _left)),
-                FlatButton.Tool(Icons.Window, null, "New window (Ctrl+N)", NewWindow),
-                FlatButton.Tool(Icons.Settings, null, "Settings", OpenSettings));
+                FlatButton.Tool(Icons.Server, "Sites", "Sites|Add, edit and connect to your saved servers and shares (Ctrl+S)", () => OpenSites(null)),
+                FlatButton.Tool(Icons.Sync, "Sync", "Compare and sync|Compare the folders open on the left and right, then copy the differences (preview first)", () => OpenSync(_active ?? _left)),
+                FlatButton.Tool(Icons.Terminal, "Terminal", "Terminal|Choose a server and open an SSH terminal on it (F9)", PickTerminal),
+                FlatButton.Tool(Icons.Window, null, "New window|Open another TransferFTP window. All windows share one transfer queue (Ctrl+N)", NewWindow),
+                FlatButton.Tool(Icons.Settings, null, "Settings|Transfers, editor, theme and updates", OpenSettings));
+            // Shown only when a new version is out: one click downloads, installs and restarts.
+            _updateBtn = FlatButton.Primary("Update", () => InstallUpdate());
+            _updateBtn.MinHeight = 32;
+            _updateBtn.Height = 32;
+            _updateBtn.Padding = new Thickness(14, 0, 14, 0);
+            _updateBtn.Margin = new Thickness(0, 0, 10, 0);
+            _updateBtn.Visibility = Visibility.Collapsed;
+            Updates.Changed += ShowUpdate;
+            ShowUpdate();
             var header = new DockPanel { Margin = new Thickness(18, 12, 18, 10) };
             DockPanel.SetDock(actions, Dock.Right);
             header.Children.Add(actions);
+            DockPanel.SetDock(_updateBtn, Dock.Right);
+            header.Children.Add(_updateBtn);
             header.Children.Add(logo);
 
             // Panes
@@ -91,6 +103,7 @@ namespace TransferFTP
                     p.RequestSiteManager = () => OpenSites(null);
                 };
                 side.CurrentChanged += SetActive;
+                side.NewTabPrompt = PickNewTab;
             }
             var panes = new Grid { Margin = new Thickness(14, 0, 14, 0) };
             panes.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 300 });
@@ -148,17 +161,20 @@ namespace TransferFTP
             Log.Line += OnLogLine;
 
             _tabTransfers = Tab("Transfers", () => ShowTab(0));
+            Tips.Set(_tabTransfers, "Transfers|Files copying, waiting, finished or failed");
             _tabEdits = Tab("Editing", () => ShowTab(1));
+            Tips.Set(_tabEdits, "Editing|Server files open in your editor. Each save uploads automatically");
             _tabLog = Tab("Log", () => ShowTab(2));
-            _pauseAll = FlatButton.Tool(Icons.Pause, "Pause all", "Pause or resume every transfer", TogglePauseAll);
+            Tips.Set(_tabLog, "Log|Connections, transfers and errors from this session");
+            _pauseAll = FlatButton.Tool(Icons.Pause, "Pause all", "Pause all|Pause every transfer. Press again to carry on from where they stopped", TogglePauseAll);
             _queueSummary = UI.Text("", 12, Theme.Muted);
             _queueSummary.VerticalAlignment = VerticalAlignment.Center;
             _queueSummary.Margin = new Thickness(14, 0, 0, 0);
             var queueTools = UI.H(2,
                 _pauseAll,
-                FlatButton.Tool(Icons.Retry, "Retry failed", "Try failed transfers again", () => TransferQueue.Instance.RetryFailed()),
-                FlatButton.Tool(Icons.Check, "Clear finished", "Remove finished transfers from the list", () => TransferQueue.Instance.ClearFinished()),
-                FlatButton.Tool(Icons.Close, "Cancel all", "Cancel all transfers", () =>
+                FlatButton.Tool(Icons.Retry, "Retry failed", "Retry failed|Try every failed transfer again, resuming where possible", () => TransferQueue.Instance.RetryFailed()),
+                FlatButton.Tool(Icons.Check, "Clear finished", "Clear finished|Remove finished, skipped and cancelled transfers from the list", () => TransferQueue.Instance.ClearFinished()),
+                FlatButton.Tool(Icons.Close, "Cancel all", "Cancel all|Stop every transfer. Files already copied stay where they are", () =>
                 {
                     if (TransferQueue.Instance.ActiveCount == 0 || Dialogs.Confirm("Cancel all transfers?", "Files already copied stay where they are.", "Cancel all")) TransferQueue.Instance.CancelAll();
                 }));
@@ -205,6 +221,7 @@ namespace TransferFTP
             Closing += OnClosing;
             Closed += (o, e) =>
             {
+                Updates.Changed -= ShowUpdate;
                 Log.Line -= OnLogLine;
                 TransferQueue.Instance.Finished -= OnJobFinished;
                 TransferQueue.Instance.Changed -= UpdateSummary;
@@ -224,6 +241,23 @@ namespace TransferFTP
                 _log.ScrollIntoView(_logLines[_logLines.Count - 1]);
                 if (error) _tabLog.Content = "Log (!)";
             }));
+        }
+
+        private void ShowUpdate()
+        {
+            if (Updates.Installing) return;
+            _updateBtn.Visibility = Updates.Available ? Visibility.Visible : Visibility.Collapsed;
+            if (!Updates.Available) return;
+            _updateBtn.Content = UI.H(8, UI.Icon(Icons.Download, 15, Theme.Dark, 2), UI.Text("Update to " + Updates.LatestVersion, 13, Theme.Dark, FontWeights.SemiBold));
+            Tips.Set(_updateBtn, "Update to " + Updates.LatestVersion + "|One click downloads it, installs it and reopens TransferFTP with your tabs as they were. You're on " + Updates.CurrentText + ".");
+        }
+
+        private async void InstallUpdate()
+        {
+            _updateBtn.IsEnabled = false;
+            await Updates.Install(s => Dispatcher.BeginInvoke(new Action(() =>
+                _updateBtn.Content = UI.Text(s, 13, Theme.Dark, FontWeights.SemiBold))));
+            if (!Updates.Installing) { _updateBtn.IsEnabled = true; ShowUpdate(); }
         }
 
         private void NewWindow()
@@ -384,14 +418,79 @@ namespace TransferFTP
             new SyncWindow(a.Fs, a.CurrentPath, b.Fs, b.CurrentPath).Show();
         }
 
-        private void OpenTerminal(FilePane from)
+        private HashSet<string> ConnectedSiteIds() =>
+            new HashSet<string>(AllPanes.Where(p => p.Fs?.Site != null && p.Fs.IsConnected).Select(p => p.Fs.Site.Id));
+
+        /// <summary>"Where should the new tab open?" This PC, the same place, a saved site, a quick link, or a new site.</summary>
+        private void PickNewTab(PaneSide side)
         {
-            var pane = from?.Fs?.Site != null && from.Fs.Site.IsSsh ? from : new[] { _active, _left, _right }.FirstOrDefault(p => p?.Fs?.Site != null && p.Fs.Site.IsSsh);
-            if (pane == null)
+            var current = side.Current;
+            var choices = new List<PlaceChoice>
             {
-                Dialogs.Info("Terminal", "Connect one side to an SFTP or SCP site to open a terminal on it.");
+                new PlaceChoice { Kind = PlaceKind.Local, Title = "This PC", Detail = "Your drives and folders", Group = "Start", Icon = Icons.Folder },
+            };
+            if (current?.Fs != null)
+                choices.Add(new PlaceChoice { Kind = PlaceKind.Duplicate, Title = "Same as this tab", Detail = current.TabTitle + (string.IsNullOrEmpty(current.CurrentPath) ? "" : "  \u00b7  " + current.CurrentPath), Group = "Start", Icon = Icons.Copy });
+            choices.AddRange(PlacePickerWindow.Sites(s => true, ConnectedSiteIds(), "Saved sites"));
+            foreach (var q in Settings.Current.QuickLinks.OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                string where = q.Source == "local" ? "This PC" : SiteStore.Find(q.Source)?.Name;
+                if (where == null) continue;
+                choices.Add(new PlaceChoice { Kind = PlaceKind.QuickLink, Title = q.Name, Detail = where + "  \u00b7  " + q.Path, Group = "Quick links", Icon = Icons.Star, Source = q.Source, Path = q.Path });
+            }
+            choices.Add(new PlaceChoice { Kind = PlaceKind.NewSite, Title = "New connection...", Detail = "Add a server or network share and open it in the new tab", Group = "New", Icon = Icons.Plus });
+
+            var w = new PlacePickerWindow("New tab", "Choose what to open in the new tab on the " + side.Side + " side.", choices, "Open");
+            if (w.ShowDialog() != true || w.Picked == null) return;
+            var c = w.Picked;
+            switch (c.Kind)
+            {
+                case PlaceKind.Local: side.AddTab().OpenLocal(null); break;
+                case PlaceKind.Duplicate: side.Duplicate(); break;
+                case PlaceKind.Site: side.AddTab().Connect(c.Site, null); break;
+                case PlaceKind.QuickLink: side.AddTab().OpenPlace(c.Source, c.Path); break;
+                case PlaceKind.NewSite:
+                    new SiteManagerWindow(startNew: true, actionLabel: "Open in new tab",
+                        actionTip: "Open in new tab|Save this site, then connect to it in a new tab",
+                        action: site => { var t = side.AddTab(); t.Connect(site, null); SetActive(t); }).ShowDialog();
+                    return;
+            }
+            SetActive(side.Current);
+            side.Current.FocusList();
+        }
+
+        /// <summary>"Which server?" for the Terminal button: any saved SFTP or SCP site, or a new one.</summary>
+        private void PickTerminal()
+        {
+            var connected = ConnectedSiteIds();
+            var choices = PlacePickerWindow.Sites(s => s.IsSsh, connected, "SSH servers").ToList();
+            choices.Add(new PlaceChoice { Kind = PlaceKind.NewSite, Title = "New SSH connection...", Detail = "Add a server you sign in to with SSH, then open a terminal", Group = "New", Icon = Icons.Plus });
+            var preselectSite = new[] { _active, _left, _right }.FirstOrDefault(p => p?.Fs?.Site != null && p.Fs.Site.IsSsh)?.Fs.Site;
+            var preselect = choices.FirstOrDefault(c => c.Site != null && c.Site.Id == preselectSite?.Id);
+            string subtitle = choices.Count == 1
+                ? "You don't have any SFTP or SCP sites yet. Add one to open a terminal on it."
+                : "Pick the server to open an SSH terminal on.";
+            var w = new PlacePickerWindow("Open a terminal", subtitle, choices, "Open terminal", preselect);
+            if (w.ShowDialog() != true || w.Picked == null) return;
+            if (w.Picked.Kind == PlaceKind.NewSite)
+            {
+                new SiteManagerWindow(startNew: true, newProtocol: Protocol.SFTP, actionLabel: "Open terminal",
+                    actionTip: "Open terminal|Save this site, then open an SSH terminal on it",
+                    action: site => new TerminalWindow(site, string.IsNullOrWhiteSpace(site.RemoteFolder) ? null : site.RemoteFolder).Show()).ShowDialog();
                 return;
             }
+            var siteChosen = w.Picked.Site;
+            // Start in the folder already open for that server, if there is one.
+            var open = new[] { _active }.Concat(AllPanes).FirstOrDefault(p => p?.Fs?.Site?.Id == siteChosen.Id && p.Fs.IsConnected);
+            string dir = open?.CurrentPath ?? (string.IsNullOrWhiteSpace(siteChosen.RemoteFolder) ? null : siteChosen.RemoteFolder);
+            new TerminalWindow(siteChosen, dir).Show();
+        }
+
+        private void OpenTerminal(FilePane from)
+        {
+            // The terminal button inside a pane opens straight onto that pane's server; otherwise ask which one.
+            if (from?.Fs?.Site == null || !from.Fs.Site.IsSsh) { PickTerminal(); return; }
+            var pane = from;
             new TerminalWindow(pane.Fs.Site, pane.CurrentPath).Show();
         }
 
@@ -406,8 +505,8 @@ namespace TransferFTP
             bool ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
             bool shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
             if (ctrl && e.Key == Key.S) OpenSites(null);
-            else if (e.Key == Key.F9) OpenTerminal(_active);
-            else if (ctrl && e.Key == Key.T) ActiveSide.Duplicate();
+            else if (e.Key == Key.F9) PickTerminal();
+            else if (ctrl && e.Key == Key.T) ActiveSide.NewTab();
             else if (ctrl && e.Key == Key.W) ActiveSide.CloseTab(ActiveSide.Current);
             else if (ctrl && e.Key == Key.Tab) ActiveSide.Cycle(shift ? -1 : 1);
             else if (ctrl && e.Key == Key.N) NewWindow();
@@ -418,7 +517,7 @@ namespace TransferFTP
         private void OnClosing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             bool last = _openWindows <= 1;
-            if (last && TransferQueue.Instance.IsBusy &&
+            if (last && !Updates.Installing && TransferQueue.Instance.IsBusy &&
                 !Dialogs.Confirm("Transfers are still running", "Closing now stops them. Paused and unfinished files can be resumed next time by copying them again.", "Close anyway"))
             {
                 e.Cancel = true;

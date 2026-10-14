@@ -99,9 +99,10 @@ namespace TransferFTP
 
             // Row 1: where we are connected
             _source = new ComboBox { MinWidth = 220, FontSize = 13 };
+            Tips.Set(_source, "Place|Choose This PC or one of your saved sites to show on this side");
             _source.SelectionChanged += (s, e) => { if (!_suppressSourceChange) SourcePicked(); };
-            _connectBtn = FlatButton.Tool(Icons.Plug, "Connect", "Connect", () => ToggleConnection());
-            _terminalBtn = FlatButton.Tool(Icons.Terminal, null, "Open an SSH terminal", () => RequestTerminal?.Invoke(this));
+            _connectBtn = FlatButton.Tool(Icons.Plug, "Connect", "Connect or disconnect|Close the connection to this site, or open it again", () => ToggleConnection());
+            _terminalBtn = FlatButton.Tool(Icons.Terminal, null, "Terminal on this server|Open an SSH terminal in the folder you're looking at", () => RequestTerminal?.Invoke(this));
             _conn = UI.Text("", 12, Theme.Muted);
             _conn.VerticalAlignment = VerticalAlignment.Center;
             _conn.TextTrimming = TextTrimming.CharacterEllipsis;
@@ -117,24 +118,26 @@ namespace TransferFTP
 
             // Row 2: navigation and path
             _path = new TextBox { Height = 32, FontSize = 13, FontFamily = Theme.Mono };
+            Tips.Set(_path, "Folder path|Type or paste a path and press Enter to go there (Ctrl+L)");
             _path.KeyDown += (s, e) => { if (e.Key == Key.Enter) { Navigate(_path.Text.Trim()); e.Handled = true; } };
-            _filter = UI.Input("", 150, "Filter");
-            _filter.Height = 32;
+            var filterBox = new SearchBox("Filter this folder", 180);
+            Tips.Set(filterBox, "Filter|Type part of a name to show only matching files. Wildcards like *.jpg work too (Ctrl+F)");
+            _filter = filterBox.Box;
             _filter.TextChanged += (s, e) => _view?.Refresh();
             var nav = new DockPanel { Margin = new Thickness(12, 0, 12, 8) };
             var navLeft = UI.H(2,
-                FlatButton.Tool(Icons.Back, null, "Back (Alt+Left)", GoBack),
-                FlatButton.Tool(Icons.Up, null, "Up a folder (Backspace)", GoUp),
-                FlatButton.Tool(Icons.Home, null, "Home folder", GoHome),
-                FlatButton.Tool(Icons.Refresh, null, "Refresh (Ctrl+R)", Refresh),
-                FlatButton.Tool(Icons.FolderPlus, null, "New folder (F7)", NewFolder),
-                FlatButton.Tool(Icons.Star, null, "Quick links and recent folders (Ctrl+D adds this folder)", ShowLinksMenu));
+                FlatButton.Tool(Icons.Back, null, "Back|Go to the folder you were in before (Alt+Left)", GoBack),
+                FlatButton.Tool(Icons.Up, null, "Up a folder|Open the folder that contains this one (Backspace)", GoUp),
+                FlatButton.Tool(Icons.Home, null, "Home|Go to your home folder, or the site's start folder", GoHome),
+                FlatButton.Tool(Icons.Refresh, null, "Refresh|Reload the list to see the latest files (Ctrl+R)", Refresh),
+                FlatButton.Tool(Icons.FolderPlus, null, "New folder|Create a folder here (F7)", NewFolder),
+                FlatButton.Tool(Icons.Star, null, "Quick links|Jump to a saved folder or a recent one, or save this folder (Ctrl+D)", ShowLinksMenu));
             navLeft.Margin = new Thickness(0, 0, 8, 0);
-            _filter.Margin = new Thickness(8, 0, 0, 0);
+            filterBox.Margin = new Thickness(10, 0, 0, 0);
             DockPanel.SetDock(navLeft, Dock.Left);
-            DockPanel.SetDock(_filter, Dock.Right);
+            DockPanel.SetDock(filterBox, Dock.Right);
             nav.Children.Add(navLeft);
-            nav.Children.Add(_filter);
+            nav.Children.Add(filterBox);
             nav.Children.Add(_path);
 
             // Quick links for this place, as chips under the path
@@ -178,7 +181,7 @@ namespace TransferFTP
 
             _overlayText = UI.Text("", 13, Theme.Muted);
             _overlayText.TextAlignment = TextAlignment.Center;
-            _overlayRetry = FlatButton.Secondary("Try again", Refresh);
+            _overlayRetry = FlatButton.Secondary("Try again", Refresh, "Try again|Connect or load this folder again");
             _overlayRetry.HorizontalAlignment = HorizontalAlignment.Center;
             var overlayStack = UI.V(12, _overlayText, _overlayRetry);
             overlayStack.MaxWidth = 380;
@@ -464,8 +467,8 @@ namespace TransferFTP
                     Padding = new Thickness(10, 0, 12, 0),
                     CornerRadius = new CornerRadius(13),
                     Margin = new Thickness(0, 0, 6, 4),
-                    ToolTip = link.Path + "\nClick to open, middle-click for a new tab, right-click to rename or remove"
                 };
+                Tips.Set(chip, link.Name + "|" + link.Path + "\nClick to open. Middle-click opens a new tab. Right-click to rename or remove.");
                 chip.Click += (s, e) => OpenLink(link, false);
                 chip.MouseDown += (s, e) => { if (e.ChangedButton == MouseButton.Middle) { OpenLink(link, true); e.Handled = true; } };
                 chip.ContextMenu = LinkMenu(link);
@@ -1061,7 +1064,7 @@ namespace TransferFTP
             _octal = UI.Input(Convert.ToString(mode, 8).PadLeft(3, '0'), 90);
             _octal.FontFamily = Theme.Mono;
             _octal.TextChanged += (s, e) => FromOctal();
-            var ok = FlatButton.Primary("Apply", () => { DialogResult = true; });
+            var ok = FlatButton.Primary("Apply", () => { DialogResult = true; }, "Apply|Set these permissions on the selected files");
             ok.IsDefault = true;
             var cancel = FlatButton.Secondary("Cancel", () => { DialogResult = false; });
             cancel.IsCancel = true;

@@ -60,6 +60,8 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"; Tasks: deskto
 
 [Run]
 Filename: "{app}\{#MyAppExe}"; Description: "Open TransferFTP now"; Flags: nowait postinstall skipifsilent
+; After a one-click update (a silent install), start TransferFTP again.
+Filename: "{app}\{#MyAppExe}"; Flags: nowait; Check: WizardSilent
 
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/f /im {#MyAppExe}"; Flags: runhidden; RunOnceId: "StopTransferFTP"
