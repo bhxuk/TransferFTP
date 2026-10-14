@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TransferFTP for Windows</title>
+<meta name="description" content="A two-pane file transfer client for Windows. SFTP, SCP, FTP, FTPS and network shares, with sync you can preview, edit-and-save-back, server-to-server copies and a built-in SSH terminal.">
+<meta property="og:title" content="TransferFTP for Windows">
+<meta property="og:description" content="Move files anywhere: your PC, your servers, your network shares.">
+<meta property="og:image" content="https://bhxuk.github.io/TransferFTP/images/main.png">
+<meta name="theme-color" content="#07080d">
+<link rel="icon" href="images/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#07080d;--panel:#10121a;--panel2:#151823;--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.14);
+  --text:#f4f2ee;--muted:rgba(244,242,238,.62);--amber:#FFB547;--teal:#5ED3C3;--coral:#E2585F;
+  --display:'Sora',system-ui,sans-serif;--body:'Figtree',"Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:16.5px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit}
+img{display:block;max-width:100%;height:auto}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+.skip{position:absolute;left:-999px}.skip:focus{left:12px;top:12px;z-index:20;background:var(--amber);color:#1a1206;padding:8px 14px;border-radius:10px}
+
+.island{position:sticky;top:0;z-index:10;display:flex;justify-content:center;pointer-events:none}
+.island nav{pointer-events:auto;display:flex;align-items:center;gap:6px;background:#000;border:1px solid rgba(255,255,255,.06);border-top:0;border-radius:0 0 24px 24px;padding:8px 8px 8px 16px;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+.island .brand{display:flex;align-items:center;gap:8px;font-family:var(--display);font-weight:700;font-size:15px;text-decoration:none;margin-right:8px}
+.island .brand img{width:22px;height:22px}
+.island a.link{text-decoration:none;color:var(--muted);font-size:14px;font-weight:500;padding:8px 12px;border-radius:999px}
+.island a.link:hover{color:var(--text);background:rgba(255,255,255,.06)}
+.island a.get{text-decoration:none;background:var(--amber);color:#1a1206;font-weight:700;font-size:14px;padding:8px 16px;border-radius:999px}
+@media (max-width:560px){.island a.link{display:none}}
+
+header.hero{position:relative;text-align:center;padding:88px 0 0;isolation:isolate}
+.glow{position:absolute;inset:-160px 0 auto;height:900px;z-index:-1;pointer-events:none;
+  background:radial-gradient(520px 320px at 50% 28%,rgba(255,181,71,.20),transparent 70%),
+   radial-gradient(520px 300px at 18% 18%,rgba(94,211,195,.16),transparent 70%),
+   radial-gradient(520px 300px at 85% 22%,rgba(226,88,95,.12),transparent 70%)}
+.badge{display:inline-flex;align-items:center;gap:10px;text-decoration:none;font-size:13.5px;font-weight:600;background:rgba(255,255,255,.05);border:1px solid var(--line2);padding:6px 14px 6px 6px;border-radius:999px}
+.badge span{background:var(--amber);color:#1a1206;font-weight:700;padding:2px 10px;border-radius:999px;font-size:12px}
+h1{font-family:var(--display);font-size:clamp(38px,7vw,74px);line-height:1.04;letter-spacing:-.035em;font-weight:600;margin-top:26px}
+h1 .grad{background:linear-gradient(92deg,var(--amber) 10%,#F28A5B 50%,var(--teal) 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{max-width:660px;margin:22px auto 0;font-size:clamp(17px,2.2vw,19.5px);color:var(--muted)}
+.cta{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:32px}
+.btn{display:inline-flex;align-items:center;gap:10px;min-height:50px;padding:0 24px;border-radius:999px;font-weight:700;font-size:15.5px;text-decoration:none;border:1px solid var(--line2);transition:transform .15s ease,filter .15s ease,background .15s ease}
+.btn svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.btn.primary{background:var(--amber);color:#1a1206;border-color:transparent;box-shadow:0 10px 30px rgba(255,181,71,.25)}
+.btn.primary:hover{filter:brightness(1.07);transform:translateY(-1px)}
+.btn.ghost:hover{background:rgba(255,255,255,.06)}
+.meta{margin-top:16px;font-size:13.5px;color:var(--muted)}
+.stage{position:relative;margin-top:56px}
+.stage::before{content:"";position:absolute;left:50%;top:-60px;width:min(560px,70%);aspect-ratio:1;transform:translateX(-50%);border-radius:50%;background:radial-gradient(circle,rgba(255,181,71,.3),rgba(255,181,71,0) 65%);z-index:-1;filter:blur(10px)}
+.frame{border-radius:20px;padding:8px;background:linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,.03));box-shadow:0 50px 120px rgba(0,0,0,.6)}
+.frame img{border-radius:14px}
+
+.strip{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:20px;overflow:hidden;margin-top:96px}
+.strip div{background:var(--bg);padding:22px 20px;text-align:center}
+.strip b{display:block;font-family:var(--display);font-size:28px;font-weight:600;letter-spacing:-.02em}
+.strip span{color:var(--muted);font-size:14px}
+@media (max-width:700px){.strip{grid-template-columns:repeat(2,1fr)}}
+
+section{padding:110px 0 0}
+.kicker{color:var(--amber);font-weight:700;font-size:13px;letter-spacing:.1em;text-transform:uppercase}
+h2{font-family:var(--display);font-size:clamp(30px,4.4vw,46px);line-height:1.08;letter-spacing:-.03em;font-weight:600;margin-top:10px}
+.intro{color:var(--muted);max-width:640px;margin-top:14px;font-size:17.5px}
+.center{text-align:center}.center .intro{margin-left:auto;margin-right:auto}
+
+.why{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px;margin-top:40px}
+.why div{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:22px;padding:26px}
+.ic{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;margin-bottom:18px}
+.ic svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.amber{background:rgba(255,181,71,.14);color:var(--amber)}.teal{background:rgba(94,211,195,.14);color:var(--teal)}.coral{background:rgba(226,88,95,.14);color:#F07C82}
+.why h3{font-size:18px;margin-bottom:6px}
+.why p{color:var(--muted);font-size:15px}
+
+.feature{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:48px;align-items:center;margin-top:60px}
+.feature.flip{grid-template-columns:minmax(0,7fr) minmax(0,5fr)}
+.feature.flip .text{order:2}
+.feature h3{font-family:var(--display);font-size:28px;letter-spacing:-.02em;font-weight:600}
+.feature p{color:var(--muted);margin-top:10px}
+.feature ul{list-style:none;margin-top:18px;display:grid;gap:10px}
+.feature li{position:relative;padding-left:28px;color:#dcdad5;font-size:15.5px}
+.feature li::before{content:"";position:absolute;left:2px;top:.5em;width:12px;height:7px;border-left:2.4px solid var(--teal);border-bottom:2.4px solid var(--teal);transform:rotate(-45deg)}
+.feature .shot{border-radius:16px;padding:6px;background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.03));box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.feature .shot img{border-radius:11px}
+@media (max-width:860px){.feature,.feature.flip{grid-template-columns:1fr;gap:24px}.feature.flip .text{order:0}}
+
+.protos{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:30px}
+.protos span{border:1px solid var(--line2);border-radius:999px;padding:8px 16px;font-weight:600;font-size:14.5px;background:rgba(255,255,255,.03)}
+
+.keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:10px;margin-top:36px}
+.keys div{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;color:var(--muted);font-size:15px}
+kbd{font-family:var(--body);font-size:12.5px;font-weight:700;background:rgba(255,255,255,.09);border:1px solid var(--line2);border-bottom-width:2px;padding:2px 8px;border-radius:7px;color:var(--text);white-space:nowrap}
+
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:16px;margin-top:40px;counter-reset:s}
+.steps div{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:24px;position:relative}
+.steps div::before{counter-increment:s;content:counter(s);font-family:var(--display);font-weight:600;font-size:15px;width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:rgba(255,181,71,.14);color:var(--amber);margin-bottom:14px}
+.steps h3{font-size:17px}
+.steps p{color:var(--muted);font-size:15px;margin-top:4px}
+
+.final{text-align:center;margin-top:120px;padding:64px 24px;border-radius:28px;border:1px solid var(--line);background:radial-gradient(600px 260px at 50% 0%,rgba(255,181,71,.16),transparent 70%),var(--panel)}
+.final img{width:72px;height:72px;margin:0 auto 18px}
+footer{color:var(--muted);font-size:14px;text-align:center;padding:48px 0 60px}
+footer a{color:var(--text)}
+:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="island"><nav aria-label="Main">
+  <a class="brand" href="#top"><img src="images/icon.png" alt="">TransferFTP</a>
+  <a class="link" href="#features">Features</a>
+  <a class="link" href="#sync">Sync</a>
+  <a class="link" href="https://github.com/bhxuk/TransferFTP/blob/main/docs/USER-GUIDE.md">Guide</a>
+  <a class="link" href="https://github.com/bhxuk/TransferFTP">GitHub</a>
+  <a class="get" href="https://github.com/bhxuk/TransferFTP/releases/latest/download/TransferFTP-Setup.exe">Download</a>
+</nav></div>
+
+<header class="hero" id="top">
+  <div class="glow"></div>
+  <div class="wrap">
+    <a class="badge" href="https://github.com/bhxuk/TransferFTP/blob/main/CHANGELOG.md"><span>New</span>Version 1.0 is out</a>
+    <h1>Move files <span class="grad">anywhere.</span></h1>
+    <p class="lead">Your PC, your servers and your network shares side by side. SFTP, SCP, FTP, FTPS and SMB, with sync you can preview, files that save back to the server, and a terminal built in.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/bhxuk/TransferFTP/releases/latest/download/TransferFTP-Setup.exe"><svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download for Windows</a>
+      <a class="btn ghost" href="https://github.com/bhxuk/TransferFTP"><svg viewBox="0 0 24 24"><path d="M9 19c-4 1.5-4-2-6-2.5m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></svg>View on GitHub</a>
+    </div>
+    <p class="meta">Free and open source &nbsp;&#183;&nbsp; Windows 10 and 11 &nbsp;&#183;&nbsp; No admin rights needed</p>
+    <div class="stage"><div class="frame"><img src="images/main.png" width="1360" height="972" alt="TransferFTP with This PC on the left, a home server over SFTP on the right, and uploads running in the queue underneath"></div></div>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+  <div class="strip">
+    <div><b>6</b><span>connection types</span></div>
+    <div><b>2</b><span>panes, any place on either</span></div>
+    <div><b>0</b><span>passwords stored in plain text</span></div>
+    <div><b>1</b><span>small installer</span></div>
+  </div>
+
+  <section id="features" class="center">
+    <p class="kicker">What it does</p>
+    <h2>Everything a file mover should do.</h2>
+    <p class="intro">Built for moving websites, backups, media and configs between the places you keep them.</p>
+    <div class="protos"><span>SFTP</span><span>SCP</span><span>FTP</span><span>FTPS explicit</span><span>FTPS implicit</span><span>Network shares</span></div>
+    <div class="why" style="text-align:left">
+      <div><div class="ic amber"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div><h3>Drag between anything</h3><p>PC to server, server to PC, or server straight to server. Drop onto a folder to put files inside it. Hold Shift to move.</p></div>
+      <div><div class="ic teal"><svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg></div><h3>A queue that copes</h3><p>Several files at once with speed and time left. Pause and resume, and dropped connections reconnect and carry on from the same byte.</p></div>
+      <div><div class="ic coral"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4"/></svg></div><h3>Edit, save, done</h3><p>Open a file on a server in your own editor. Every save uploads automatically, so quick fixes take seconds.</p></div>
+      <div><div class="ic teal"><svg viewBox="0 0 24 24"><path d="M6 11h12v9H6zM8 11V7a4 4 0 0 1 8 0v4"/></svg></div><h3>Safe by default</h3><p>Passwords are encrypted for your Windows account. Server keys are checked and remembered, and certificate problems are shown before you trust them.</p></div>
+      <div><div class="ic amber"><svg viewBox="0 0 24 24"><path d="M8 14a4 4 0 1 1 0-8a4 4 0 0 1 0 8zM11 10h10M18 10v3M21 10v4"/></svg></div><h3>Keys, not just passwords</h3><p>OpenSSH and PuTTY keys with passphrases, plus keyboard-interactive sign-in for servers that need it.</p></div>
+      <div><div class="ic coral"><svg viewBox="0 0 24 24"><path d="M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01"/></svg></div><h3>Bring your sites</h3><p>Import saved sites from FileZilla in one click. Test a connection before you save it.</p></div>
+    </div>
+  </section>
+
+  <section id="sync">
+    <div class="feature">
+      <div class="text">
+        <p class="kicker">Compare and sync</p>
+        <h3>See every change before it happens.</h3>
+        <p>Point the two panes at two folders and press Sync. TransferFTP lists every file it would copy, create or delete, and nothing moves until you say so.</p>
+        <ul>
+          <li>Left to right, right to left, or both ways with the newer file winning</li>
+          <li>Compare by size and date, or size only</li>
+          <li>Skip lists like <code>.git;node_modules;*.tmp</code></li>
+          <li>Deletes are off unless you turn them on, and always confirmed</li>
+        </ul>
+      </div>
+      <div class="shot"><img src="images/sync.png" width="1100" height="564" alt="The sync preview listing files to copy each way, each with a tick box"></div>
+    </div>
+    <div class="feature flip">
+      <div class="text">
+        <p class="kicker">SSH terminal</p>
+        <h3>A shell, right where you are.</h3>
+        <p>Open a terminal on any SFTP or SCP site. It starts in the folder you're looking at, so restarting a service after an upload is one step.</p>
+        <ul>
+          <li>Tab completion, history and line editing</li>
+          <li>Ctrl+C to stop a command, right-click to paste</li>
+          <li>One click to open the same server in Windows Terminal for vim or htop</li>
+        </ul>
+      </div>
+      <div class="shot"><img src="images/terminal.png" width="1000" height="515" alt="The built-in terminal connected to an Ubuntu server"></div>
+    </div>
+  </section>
+
+  <section class="center">
+    <p class="kicker">Keyboard</p>
+    <h2>Fast with the keys too.</h2>
+    <div class="keys" style="text-align:left">
+      <div>Copy to the other side <kbd>F5</kbd></div>
+      <div>Move to the other side <kbd>F6</kbd></div>
+      <div>Rename <kbd>F2</kbd></div>
+      <div>New folder <kbd>F7</kbd></div>
+      <div>Edit on server <kbd>F4</kbd></div>
+      <div>Switch sides <kbd>Tab</kbd></div>
+      <div>Filter <kbd>Ctrl+F</kbd></div>
+      <div>Terminal <kbd>F9</kbd></div>
+    </div>
+  </section>
+
+  <section class="center">
+    <p class="kicker">Get started</p>
+    <h2>Connected in a minute.</h2>
+    <div class="steps" style="text-align:left">
+      <div><h3>Install</h3><p>Run TransferFTP-Setup.exe. It installs just for you, no admin rights needed.</p></div>
+      <div><h3>Add a site</h3><p>Press Sites, choose the type, add the host and sign-in, and test it.</p></div>
+      <div><h3>Drag files</h3><p>Open it on one side, your PC on the other, and drag. The queue does the rest.</p></div>
+    </div>
+  </section>
+
+  <div class="final">
+    <img src="images/icon.png" alt="">
+    <h2>Ready when you are.</h2>
+    <p class="intro" style="margin:12px auto 0">Free, open source, and small enough to keep around.</p>
+    <div class="cta"><a class="btn primary" href="https://github.com/bhxuk/TransferFTP/releases/latest/download/TransferFTP-Setup.exe"><svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download for Windows</a></div>
+    <p class="meta">Windows may say "Windows protected your PC" because the installer isn't code-signed. Click More info, then Run anyway.</p>
+  </div>
+</main>
+
+<footer>
+  <p>TransferFTP is made by <a href="https://github.com/bhxuk">bhxuk</a> &nbsp;&#183;&nbsp; <a href="https://github.com/bhxuk/TransferFTP/blob/main/docs/USER-GUIDE.md">User guide</a> &nbsp;&#183;&nbsp; <a href="https://github.com/bhxuk/TransferFTP/blob/main/CHANGELOG.md">What's new</a> &nbsp;&#183;&nbsp; MIT licence</p>
+  <p style="margin-top:6px">Also by bhxuk: <a href="https://bhxuk.github.io/arrakis/">Arrakis</a>, your whole desktop in one small app.</p>
+</footer>
+</body>
+</html>
