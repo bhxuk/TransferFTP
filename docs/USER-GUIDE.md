@@ -102,11 +102,13 @@ To always use one editor, such as VS Code or Notepad++, choose it in **Settings 
 
 ## Terminal
 
-For SFTP and SCP sites, press **Terminal** (or **F9**). It opens in the folder you're looking at.
+For SFTP and SCP sites, press **Terminal** (or **F9**). It opens in the folder you're looking at, in full colour, and works with full-screen programs like nano, vim, htop and less.
 
 - **Ctrl+C** stops the running command. With text selected it copies instead.
-- **Right-click** or **Ctrl+V** pastes.
-- Full-screen programs like vim, nano and htop work best in **Windows Terminal**: press that button to open the same server there.
+- **Select** text by dragging; double-click selects a word. **Right-click** copies the selection, or pastes when nothing is selected. **Ctrl+Shift+C** copies, **Ctrl+V** or **Shift+Insert** pastes.
+- **Mouse wheel** or **Shift+Page Up / Page Down** scrolls back through earlier output. Typing jumps back to the bottom.
+- **Ctrl +** and **Ctrl -** change the text size, **Ctrl+0** resets it.
+- **Windows Terminal** opens the same server in Windows Terminal if you prefer it.
 
 ## Permissions
 

@@ -1,5 +1,14 @@
 # What's new
 
+## 1.1.1
+
+- **The terminal now shows colours.** Your prompt, `ls`, `git`, `htop` and editors show their colours, including 256-colour and true-colour themes.
+- **Fixed: the Space key didn't work in the terminal**, so `df -k` arrived as `df-k`.
+- The terminal is now a proper xterm-style screen, so full-screen programs like `nano`, `vim`, `htop`, `less` and `mc` work inside TransferFTP. It also resizes with the window.
+- Select text with the mouse (double-click selects a word). Right-click copies a selection, or pastes when nothing is selected. Ctrl+Shift+C and Ctrl+V work too.
+- Scroll back through earlier output with the mouse wheel or Shift+Page Up.
+- Ctrl + and Ctrl - change the text size.
+
 ## 1.1.0
 
 - **Tabs on both sides.** Open several places at once on the left and the right. Ctrl+T opens a new tab at the same place, Ctrl+W closes it, Ctrl+Tab switches. Middle-click a tab to close it, and drag files over a tab to drop into it. Tabs come back next time you open TransferFTP.
