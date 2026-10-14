@@ -1,5 +1,9 @@
 # What's new
 
+## 1.3.1
+
+- **Fixed: "New connection..." and "New SSH connection..." showed a "Something went wrong" error** instead of opening the site form. They now open a blank site; fill it in and press **Open in new tab** or **Open terminal**.
+
 ## 1.3.0
 
 - **Free space at the bottom of each side.** Shows how much space is left on that drive, network share or server, with a small bar that turns amber when it's three-quarters full and red at 90%. Hover it for the exact used and free amounts. Works on This PC, network shares and SFTP/SCP servers. FTP servers only show it if they support reporting it (many don't).

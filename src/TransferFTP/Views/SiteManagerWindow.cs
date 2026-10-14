@@ -101,13 +101,15 @@ namespace TransferFTP
             var test = FlatButton.Secondary("Test connection", Test, "Test connection|Try signing in with these details without saving");
             var left = FlatButton.Secondary("Open on left", () => SaveAndConnect("left"), "Open on left|Save, then connect to this site in the left side");
             var right = FlatButton.Secondary("Open on right", () => SaveAndConnect("right"), "Open on right|Save, then connect to this site in the right side");
-            var buttons = UI.H(10, test, left, right, save);
+            // Each button can only sit in one row, so build the row once for the mode we're in.
+            StackPanel buttons;
             if (action != null)
             {
                 var go = FlatButton.Primary(actionLabel ?? "Connect", SaveAndRun, actionTip);
-                save = FlatButton.Secondary("Save", () => Save(true), "Save|Keep the changes to this site");
-                buttons = UI.H(10, test, save, go);
+                var saveOnly = FlatButton.Secondary("Save", () => Save(true), "Save|Keep the changes to this site");
+                buttons = UI.H(10, test, saveOnly, go);
             }
+            else buttons = UI.H(10, test, left, right, save);
 
             _form = UI.V(14,
                 UI.Field("Name", _name),
