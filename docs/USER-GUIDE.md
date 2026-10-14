@@ -59,6 +59,8 @@ Each side can hold several tabs, so you can keep a few servers or folders open a
 
 ### The queue
 
+How many files copy at once is set per site in **Sites > Files at the same time**, or for everything in Settings (4 by default). Your own machines on your home network or Tailscale cope with 6 to 16, which is much faster for lots of small files. Shared web hosts often only allow 2 to 4 connections, so keep those low.
+
 Everything you copy goes into the queue at the bottom.
 
 - **Pause all** stops every transfer where it is. **Resume all** carries on from the same byte.
@@ -126,7 +128,7 @@ In **Sites**, press **Import**:
 | Setting | What it changes |
 |---|---|
 | When a file already exists | Ask, or always overwrite, skip, overwrite if newer, or resume |
-| Files at the same time | How many transfers run at once (2 is a good start) |
+| Files at the same time | How many transfers run at once (4 by default, up to 16). Each site can set its own number in Sites |
 | Retries | How many times to reconnect and resume after a drop |
 | Keep the original modified dates | Copies keep the source file's date |
 | Show hidden files | Dot files on servers, hidden files on Windows |

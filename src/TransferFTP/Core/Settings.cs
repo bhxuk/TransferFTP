@@ -19,7 +19,13 @@ namespace TransferFTP
         public string Accent { get; set; } = "Amber";
 
         /// <summary>How many files transfer at the same time.</summary>
-        public int ParallelTransfers { get; set; } = 2;
+        public int ParallelTransfers { get; set; } = 4;
+
+        /// <summary>Bumped when a default changes, so old saved defaults can be updated once.</summary>
+        public int SettingsVersion { get; set; }
+
+        public static readonly int[] ParallelChoices = { 1, 2, 3, 4, 6, 8, 12, 16 };
+        public const int MaxParallel = 16;
 
         /// <summary>Ask, Overwrite, Skip, Newer, Resume.</summary>
         public string WhenFileExists { get; set; } = "Ask";
@@ -97,11 +103,20 @@ namespace TransferFTP
                 if (File.Exists(FilePath))
                 {
                     var s = JsonSerializer.Deserialize<Settings>(File.ReadAllText(FilePath));
-                    if (s != null) return s;
+                    if (s != null)
+                    {
+                        // 1.1.1 and earlier defaulted to 2 at a time. Move people still on that default to 4.
+                        if (s.SettingsVersion < 2)
+                        {
+                            if (s.ParallelTransfers == 2) s.ParallelTransfers = 4;
+                            s.SettingsVersion = 2;
+                        }
+                        return s;
+                    }
                 }
             }
             catch (Exception ex) { Log.Write("Settings load: " + ex.Message); }
-            return new Settings();
+            return new Settings { SettingsVersion = 2 };
         }
 
         public void Save()

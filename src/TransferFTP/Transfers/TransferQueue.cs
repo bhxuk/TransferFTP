@@ -315,11 +315,11 @@ namespace TransferFTP
                 TransferJob next = null;
                 lock (_gate)
                 {
-                    int limit = Math.Max(1, Math.Min(8, Settings.Current.ParallelTransfers));
-                    if (_running >= limit) return;
+                    if (_running >= Settings.MaxParallel) return;
                     foreach (var j in _all)
                     {
                         if (j.State != JobState.Queued) continue;
+                        if (!HasRoom(j)) continue;
                         if (j.WaitForBatch)
                         {
                             var others = _all.Where(o => o != j && o.Batch == j.Batch).ToList();
@@ -344,6 +344,39 @@ namespace TransferFTP
                 var job = next;
                 Task.Run(() => Run(job));
             }
+        }
+
+        /// <summary>The job's limit is the lowest of its sites' limits (or the Settings number for PC-only copies).</summary>
+        private static int LimitFor(TransferJob j)
+        {
+            int limit = int.MaxValue;
+            // Use the saved site, so a change in Sites applies straight away without reconnecting.
+            if (j.Src?.Site != null) limit = Math.Min(limit, (SiteStore.Find(j.Src.Site.Id) ?? j.Src.Site).Parallel);
+            if (j.Dst?.Site != null) limit = Math.Min(limit, (SiteStore.Find(j.Dst.Site.Id) ?? j.Dst.Site).Parallel);
+            if (limit == int.MaxValue) limit = Settings.Current.ParallelTransfers;
+            return Math.Max(1, Math.Min(Settings.MaxParallel, limit));
+        }
+
+        /// <summary>Call with _gate held. True when starting this job keeps every site it uses within its limit.</summary>
+        private bool HasRoom(TransferJob j)
+        {
+            int limit = LimitFor(j);
+            string a = j.Src?.Site?.Id, b = j.Dst?.Site?.Id;
+            int running = 0;
+            foreach (var r in _all)
+            {
+                if (r.State != JobState.Running) continue;
+                if (a == null && b == null)
+                {
+                    if (r.Src?.Site == null && r.Dst?.Site == null) running++;
+                }
+                else
+                {
+                    string ra = r.Src?.Site?.Id, rb = r.Dst?.Site?.Id;
+                    if ((a != null && (ra == a || rb == a)) || (b != null && (ra == b || rb == b))) running++;
+                }
+            }
+            return running < limit;
         }
 
         private void Run(TransferJob job)

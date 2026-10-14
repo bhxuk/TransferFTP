@@ -17,7 +17,7 @@ namespace TransferFTP
         private readonly TextBox _name, _host, _port, _user, _keyFile, _remote, _local, _notes;
         private readonly PasswordBox _password, _passphrase;
         private readonly CheckBox _rememberPwd, _active;
-        private readonly ComboBox _protocol;
+        private readonly ComboBox _protocol, _parallel;
         private readonly TextBlock _pwdHint, _testResult, _remoteLabel;
         private readonly StackPanel _sshOnly, _ftpOnly, _form;
         private readonly Border _ftpWarning;
@@ -77,6 +77,9 @@ namespace TransferFTP
             var localBrowse = FlatButton.Secondary("Browse", BrowseLocal);
             localBrowse.MinHeight = 34;
             _active = new CheckBox { Content = "Use active mode (only if passive doesn't work)" };
+            _parallel = new ComboBox { Width = 260 };
+            _parallel.Items.Add("Same as Settings");
+            foreach (var n in Settings.ParallelChoices) _parallel.Items.Add(n.ToString());
             _notes = new TextBox { Height = 70, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, VerticalContentAlignment = VerticalAlignment.Top, Padding = new Thickness(8, 6, 8, 6) };
 
             var hostRow = Row2(UI.Field("Host", _host), UI.Field("Port", _port), 100);
@@ -104,6 +107,8 @@ namespace TransferFTP
                 _ftpOnly,
                 UI.V(6, _remoteLabel, _remote),
                 localRow,
+                UI.Field("Files at the same time", _parallel),
+                UI.Text("Your own machines on your network or Tailscale handle 6 to 16 easily. Shared web hosts often only allow 2 to 4.", 12, Theme.Muted),
                 UI.Field("Notes", _notes),
                 _testResult,
                 buttons);
@@ -180,6 +185,8 @@ namespace TransferFTP
             _remote.Text = site.RemoteFolder;
             _local.Text = site.LocalFolder;
             _active.IsChecked = site.ActiveMode;
+            _parallel.SelectedItem = site.ParallelTransfers > 0 ? site.ParallelTransfers.ToString() : null;
+            if (_parallel.SelectedItem == null) _parallel.SelectedIndex = 0;
             _notes.Text = site.Notes;
             _testResult.Text = "";
             _loading = false;
@@ -221,6 +228,7 @@ namespace TransferFTP
             _editing.RemoteFolder = _remote.Text.Trim();
             _editing.LocalFolder = _local.Text.Trim().Trim('"');
             _editing.ActiveMode = _active.IsChecked == true;
+            _editing.ParallelTransfers = _parallel.SelectedIndex <= 0 ? 0 : int.Parse((string)_parallel.SelectedItem);
             _editing.Notes = _notes.Text;
             return true;
         }

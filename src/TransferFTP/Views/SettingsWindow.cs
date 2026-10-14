@@ -20,7 +20,7 @@ namespace TransferFTP
             var exists = UI.Combo(whenLabels, whenLabels[Math.Max(0, Array.IndexOf(whenExists, s.WhenFileExists))], 220);
             exists.SelectionChanged += (o, e) => s.WhenFileExists = whenExists[exists.SelectedIndex];
 
-            var parallel = UI.Combo(new[] { "1", "2", "3", "4", "6", "8" }, s.ParallelTransfers.ToString(), 120);
+            var parallel = UI.Combo(Array.ConvertAll(Settings.ParallelChoices, x => x.ToString()), s.ParallelTransfers.ToString(), 120);
             parallel.SelectionChanged += (o, e) => s.ParallelTransfers = int.Parse((string)parallel.SelectedItem);
 
             var retries = UI.Combo(new[] { "0", "1", "2", "3", "5" }, s.RetryCount.ToString(), 120);
@@ -64,7 +64,7 @@ namespace TransferFTP
                 UI.Text("Settings", 22, Theme.Text, FontWeights.SemiBold, true),
                 Section("Transfers",
                     UI.Field("When a file already exists", exists),
-                    UI.Field("Files at the same time", parallel),
+                    UI.Field("Files at the same time (sites can set their own in Sites)", parallel),
                     UI.Field("Retries after a dropped connection", retries),
                     Tick("Keep the original modified dates", s.PreserveTimestamps, v => s.PreserveTimestamps = v)),
                 Section("Files",

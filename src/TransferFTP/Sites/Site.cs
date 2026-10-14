@@ -31,6 +31,11 @@ namespace TransferFTP
         public string RemoteFolder { get; set; } = "";
         public string LocalFolder { get; set; } = "";
         public bool ActiveMode { get; set; }
+
+        /// <summary>Files at the same time for this site. 0 uses the number in Settings.</summary>
+        public int ParallelTransfers { get; set; }
+
+        [JsonIgnore] public int Parallel => ParallelTransfers > 0 ? ParallelTransfers : Settings.Current.ParallelTransfers;
         public string Notes { get; set; } = "";
         public DateTime LastUsed { get; set; }
 

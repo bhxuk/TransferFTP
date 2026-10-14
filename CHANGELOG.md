@@ -1,5 +1,11 @@
 # What's new
 
+## 1.1.2
+
+- **4 files at a time by default** instead of 2. If you were still on the old default, you're moved to 4 automatically.
+- **Each site can set its own number**, from 1 to 16, in Sites > Files at the same time. Use a high number for your own machines on your network or Tailscale, and keep shared web hosts at 2 to 4.
+- The Settings number now goes up to 16 and is used for sites that don't set their own.
+
 ## 1.1.1
 
 - **The terminal now shows colours.** Your prompt, `ls`, `git`, `htop` and editors show their colours, including 256-colour and true-colour themes.
