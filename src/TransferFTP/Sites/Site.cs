@@ -231,7 +231,7 @@ namespace TransferFTP
             return added;
         }
 
-        /// <summary>FileZilla stores remote paths like "1 0 4 home 4 shaam". Turn that into /home/shaam.</summary>
+        /// <summary>FileZilla stores remote paths like "1 0 4 home 4 user". Turn that into /home/user.</summary>
         private static string ParseFileZillaPath(string raw)
         {
             if (string.IsNullOrWhiteSpace(raw)) return "";

@@ -11,7 +11,7 @@ with folder sync you can preview, edit-and-save-back, server-to-server copies an
 
 **[Download TransferFTP for Windows](https://github.com/bhxuk/TransferFTP/releases/latest/download/TransferFTP-Setup.exe)**  ·  [Website](https://bhxuk.github.io/TransferFTP/)  ·  [User guide](docs/USER-GUIDE.md)  ·  [What's new](CHANGELOG.md)
 
-<img src="docs/images/main.png" alt="TransferFTP with tabs on both sides and quick links under each path, This PC on the left, a home server over SFTP on the right and uploads running in the queue below" width="900">
+<img src="docs/images/main.png" alt="TransferFTP with tabs on both sides, quick links under each path, free space and folder sizes along the bottom, and uploads running in the queue below" width="900">
 
 </div>
 
@@ -43,9 +43,25 @@ Choose a direction, press Compare, untick anything you want left alone, then Syn
 
 ### SSH terminal
 
-Opens in the folder you have open. Ctrl+C stops a command, right-click pastes.
+Press Terminal and pick a server. It opens in the folder you have open, in full colour, and nano, vim and htop work inside it.
 
-<img src="docs/images/terminal.png" alt="The built-in terminal connected to an Ubuntu server" width="760">
+<img src="docs/images/terminal.png" alt="The built-in terminal in colour" width="760">
+
+### New tabs
+
+Every new tab asks where to open: This PC, the same place, a saved site, a quick link, or a new connection.
+
+<img src="docs/images/newtab.png" alt="The new tab picker" width="420">
+
+### Network shares
+
+Leave the share blank and see every shared drive on a PC or NAS, with free space on each.
+
+<img src="docs/images/shares.png" alt="A network computer's shares listed with their free space" width="640">
+
+### One-click updates
+
+<img src="docs/images/update.png" alt="The Update button with its hover help" width="640">
 
 ## Install
 

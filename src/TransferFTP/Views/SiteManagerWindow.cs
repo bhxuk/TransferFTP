@@ -240,7 +240,7 @@ namespace TransferFTP
             _sshOnly.Visibility = ssh ? Visibility.Visible : Visibility.Collapsed;
             _ftpOnly.Visibility = ftp ? Visibility.Visible : Visibility.Collapsed;
             _ftpWarning.Visibility = p == Protocol.FTP ? Visibility.Visible : Visibility.Collapsed;
-            _remoteLabel.Text = p == Protocol.SMB ? "Share and folder (optional, e.g. NAS-1TB-A or media/films)" : "Start in folder";
+            _remoteLabel.Text = p == Protocol.SMB ? "Share and folder (optional, e.g. Media or Media/Films)" : "Start in folder";
             Hint.Set(_remote, p == Protocol.SMB ? "Leave blank to see every share on this computer" : "Leave blank for the home folder");
             Hint.Set(_host, p == Protocol.SMB ? "Computer name or address, e.g. nas or nas.tailnet.ts.net" : "server.example.com or 192.168.1.10");
             Hint.Set(_user, p == Protocol.SMB ? "Leave blank to use your Windows sign-in" : "");
