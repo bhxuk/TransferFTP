@@ -70,6 +70,14 @@ Each side can hold several tabs, so you can keep a few servers or folders open a
 - **F5** copies the selection to the folder open on the other side. **F6** moves it.
 - Both sides can be servers: drag from one server to another and the files stream through your PC.
 
+### Copy, cut and paste
+
+- Select files and press **Ctrl+C** to copy or **Ctrl+X** to cut. Go to another folder (in the same tab, another tab, the other side, another window, or another server) and press **Ctrl+V** to paste. The same commands are on the right-click menu.
+- Pasting into the folder the files came from makes copies named "name - Copy".
+- Cut and paste within the same drive or server just moves the files, so it's instant. Between different places, the files are copied, then removed from where they were once they've arrived safely.
+- Files copied in **Windows Explorer** can be pasted into any folder here, including on a server. Files copied from This PC or a network share here can be pasted into Explorer.
+- **Ctrl+Insert** copies and **Shift+Insert** pastes, too.
+
 ### The queue
 
 How many files copy at once is set per site in **Sites > Files at the same time**, or for everything in Settings (4 by default). Your own machines on your home network or Tailscale cope with 6 to 16, which is much faster for lots of small files. Shared web hosts often only allow 2 to 4 connections, so keep those low.

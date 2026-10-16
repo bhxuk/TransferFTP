@@ -1,5 +1,14 @@
 # What's new
 
+## 1.4.0
+
+- **Copy, cut and paste files.** Select files and press **Ctrl+C** (copy) or **Ctrl+X** (cut), go to any other folder, and press **Ctrl+V**. It works in the same tab, in another tab, on the other side, in another window, and between servers. Also on the right-click menu as **Cut**, **Copy** and **Paste**.
+- **Works with Windows Explorer.** Files copied in Explorer paste into any folder or server in TransferFTP, and files copied from This PC or a network share paste into Explorer.
+- Pasting into the same folder makes a copy named "name - Copy", like Explorer.
+- Cut and paste on the same drive or server is a quick rename, not a copy and delete.
+- The status bar confirms what you copied or cut.
+- The site form's hint for network shares uses a neutral example.
+
 ## 1.3.2
 
 - **See every share on a network computer.** For a Network share site, leave **Share and folder** blank and TransferFTP opens on a list of all the computer's shared drives and folders, with the free space on each, just like typing \\\\computer in Explorer. Double-click one to open it. **Up** from any share goes back to the list.

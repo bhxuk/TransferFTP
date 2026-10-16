@@ -163,7 +163,8 @@ namespace TransferFTP
         public void Add(TransferJob job) => Add(new[] { job });
 
         /// <summary>Copies (or moves) items from one place to a folder in another, walking folders in the background.</summary>
-        public void Copy(FileSystem src, IList<FsItem> items, FileSystem dst, string dstDir, bool move)
+        /// <param name="renameTo">Optional new names by source path, used when pasting a copy into the same folder.</param>
+        public void Copy(FileSystem src, IList<FsItem> items, FileSystem dst, string dstDir, bool move, IDictionary<string, string> renameTo = null)
         {
             string batch = Guid.NewGuid().ToString("N");
             var picked = items.Where(i => !i.IsParent && !i.IsDrive).ToList();
@@ -177,7 +178,8 @@ namespace TransferFTP
                     walker = Acquire(src);
                     foreach (var item in picked)
                     {
-                        string target = dst.Combine(dstDir, item.Name);
+                        string name = renameTo != null && renameTo.TryGetValue(item.FullPath, out var n) ? n : item.Name;
+                        string target = dst.Combine(dstDir, name);
                         if (item.IsDir)
                         {
                             Log.Info("Scanning " + item.FullPath);

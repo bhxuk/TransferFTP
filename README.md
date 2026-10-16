@@ -75,6 +75,7 @@ Needs Windows 10 (version 2004 or later) or Windows 11, 64-bit. Everything it ne
 
 | Key | Does |
 |---|---|
+| Ctrl+C / Ctrl+X / Ctrl+V | Copy, cut and paste files, to any folder, tab, server or Explorer |
 | F5 / F6 | Copy / move the selection to the other side |
 | F2 / F7 / Del | Rename / new folder / delete |
 | F4 or Enter | Edit a remote file (Enter opens folders) |

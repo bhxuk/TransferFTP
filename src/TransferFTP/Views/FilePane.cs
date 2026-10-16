@@ -79,6 +79,19 @@ namespace TransferFTP
         private bool _sizing;
         private long _treeTotal = -1;       // folder size including subfolders, once worked out
         private string _sizeProgress;
+        private string _flash;
+        private DispatcherTimer _flashTimer;
+
+        /// <summary>Shows a short message in the status bar for a few seconds.</summary>
+        private void Flash(string text)
+        {
+            _flash = text;
+            _flashTimer?.Stop();
+            _flashTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+            _flashTimer.Tick += (s, e) => { _flashTimer.Stop(); _flash = null; UpdateStatus(); };
+            _flashTimer.Start();
+            UpdateStatus();
+        }
         private readonly TextBlock _conn;
         private readonly Border _overlay;
         private readonly TextBlock _overlayText;
@@ -758,6 +771,7 @@ namespace TransferFTP
                 _status.Text = _sizeProgress ?? "Adding up...";
                 return;
             }
+            if (_flash != null) { _status.Text = _flash; return; }
             if (sel.Count > 0)
             {
                 long bytes = sel.Sum(i => (!i.IsDir || i.SizeComputed) ? Math.Max(0, i.Size) : 0);
@@ -957,6 +971,93 @@ namespace TransferFTP
             return true;
         }
 
+        // ---------------- Copy, cut and paste ----------------
+
+        /// <summary>Puts the selection on the clipboard. Paste it into any folder, tab, window, server or Explorer.</summary>
+        public void CopySelection(bool cut)
+        {
+            var items = Selected().Where(i => !i.IsDrive).ToList();
+            if (items.Count == 0 || Fs == null) return;
+            FileClipboard.Set(Fs, CurrentPath, items, cut);
+            Flash((cut ? "Cut " : "Copied ") + FileClipboard.Describe(items) + ". Open a folder and press Ctrl+V to paste.");
+        }
+
+        private static string Norm(string p) => (p ?? "").TrimEnd('/', '\\');
+
+        /// <summary>Pastes into the folder that's open here. Same folder makes "name - Copy"; cut moves.</summary>
+        public void PasteHere()
+        {
+            if (Fs == null) return;
+            if (FileSystem.IsTopList(Fs, CurrentPath)) { Dialogs.Info("Open a folder first", "Paste goes into a folder. Open one, then press Ctrl+V."); return; }
+            if (Fs.Site != null && !Fs.IsConnected) { Dialogs.Info("Not connected", "Connect to " + Fs.Site.Name + " first, then paste."); return; }
+            if (!FileClipboard.TryGet(out var srcFs, out var items, out bool cut, out string srcDir))
+            {
+                Dialogs.Info("Nothing to paste", "Select files and press Ctrl+C (copy) or Ctrl+X (cut) first. Files copied in Windows Explorer can be pasted here too.");
+                return;
+            }
+            var dst = Fs;
+            string target = CurrentPath;
+            bool sameFs = srcFs.Key == dst.Key;
+            var cmp = dst.IsLocal || dst is LocalFs ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            bool sameDir = sameFs && string.Equals(Norm(srcDir), Norm(target), cmp);
+
+            // A folder can't go inside itself.
+            foreach (var d in items.Where(i => i.IsDir))
+            {
+                string src = Norm(d.FullPath);
+                if (sameFs && (string.Equals(src, Norm(target), cmp) || Norm(target).StartsWith(src + dst.Sep, cmp)))
+                {
+                    Dialogs.Info("Can't paste here", "\"" + d.Name + "\" can't be pasted inside itself.");
+                    return;
+                }
+            }
+
+            bool ours = srcFs == FileClipboard.Fs;
+            if (cut)
+            {
+                if (sameDir) return;   // already there
+                bool canRename = sameFs && !(dst is LocalFs && !(dst is SmbFs) &&
+                    !string.Equals(Path.GetPathRoot(srcDir ?? ""), Path.GetPathRoot(target), StringComparison.OrdinalIgnoreCase));
+                if (canRename)
+                {
+                    // Same place: a quick rename instead of copying everything.
+                    var list = items.ToList();
+                    RunThenRefresh(() =>
+                    {
+                        foreach (var it in list)
+                        {
+                            string to = dst.Combine(target, it.Name);
+                            if (dst.Stat(to) != null) throw new IOException("\"" + it.Name + "\" already exists in this folder. Nothing after it was moved.");
+                            dst.Rename(it.FullPath, to);
+                        }
+                    }, "Couldn't move", null);
+                    Other?.RefreshSoon();
+                }
+                else TransferQueue.Instance.Copy(srcFs, items, dst, target, true);
+                Log.Info("Moving " + FileClipboard.Describe(items) + " to " + target);
+                Flash("Moving " + FileClipboard.Describe(items) + " here...");
+                if (ours) FileClipboard.Clear();
+                return;
+            }
+
+            Dictionary<string, string> rename = null;
+            if (sameDir)
+            {
+                // Pasting into the same folder makes copies alongside, like Explorer.
+                var taken = new HashSet<string>(_items.Select(i => i.Name), dst.IsLocal || dst is LocalFs ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+                rename = new Dictionary<string, string>();
+                foreach (var it in items)
+                {
+                    string n = FileClipboard.CopyName(it.Name, it.IsDir, taken);
+                    taken.Add(n);
+                    rename[it.FullPath] = n;
+                }
+            }
+            TransferQueue.Instance.Copy(srcFs, items, dst, target, false, rename);
+            Log.Info("Pasting " + FileClipboard.Describe(items) + " into " + target);
+            Flash("Pasting " + FileClipboard.Describe(items) + "...");
+        }
+
         public void SendToOther(bool move)
         {
             var items = Selected().Where(i => !i.IsDrive).ToList();
@@ -1055,6 +1156,12 @@ namespace TransferFTP
 
             if (one && !sel[0].IsDir) Item(local ? "Open" : "Edit (saves back automatically)", "Enter", () => OpenFile(sel[0]));
             if (one && sel[0].IsDir) Item("Open", "Enter", () => Navigate(sel[0].FullPath));
+            bool canPaste = Fs != null && !FileSystem.IsTopList(Fs, CurrentPath) && FileClipboard.HasContent;
+            Item("Cut", "Ctrl+X", () => CopySelection(true), any);
+            Item("Copy", "Ctrl+C", () => CopySelection(false), any);
+            Item(FileClipboard.HasContent && FileClipboard.Items.Count > 0 && FileClipboard.Fs != null
+                    ? "Paste " + FileClipboard.Describe(FileClipboard.Items) + " here" : "Paste", "Ctrl+V", PasteHere, canPaste);
+            m.Items.Add(new Separator());
             Item("Copy to other side " + arrow, "F5", () => SendToOther(false), any);
             Item("Move to other side " + arrow, "F6", () => SendToOther(true), any);
             m.Items.Add(new Separator());
@@ -1092,6 +1199,7 @@ namespace TransferFTP
         {
             bool ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
             bool alt = (Keyboard.Modifiers & ModifierKeys.Alt) != 0;
+            bool shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
             var key = e.Key == Key.System ? e.SystemKey : e.Key;
             switch (key)
             {
@@ -1134,6 +1242,22 @@ namespace TransferFTP
                 case Key.D when ctrl:
                     AddQuickLink();
                     break;
+                case Key.C when ctrl:
+                    CopySelection(false);
+                    break;
+                case Key.X when ctrl:
+                    CopySelection(true);
+                    break;
+                case Key.V when ctrl:
+                    PasteHere();
+                    break;
+                case Key.Insert when ctrl:
+                    CopySelection(false);
+                    break;
+                case Key.Insert when shift:
+                    PasteHere();
+                    break;
+
                 case Key.Tab when !ctrl:
                     Other?.FocusList();
                     break;
